@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Location URL Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .pass { background: #d4edda; border-color: #c3e6cb; }
+        .fail { background: #f8d7da; border-color: #f5c6cb; }
+        input { width: 100%; padding: 10px; margin: 10px 0; font-size: 14px; }
+        .preview { padding: 15px; background: #e7f3ff; border: 2px solid #0ea5e9; border-radius: 8px; margin-top: 10px; }
+        code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Google Maps Location URL Debugger</h1>
+
+    <div>
+        <h2>Test Input</h2>
+        <input
+            type="text"
+            id="locationInput"
+            placeholder="Paste Google Maps URL here"
+            value="https://maps.app.goo.gl/KTsfhJb3dyPuTaZV8"
+        />
+        <button onclick="testURL()" style="padding: 10px 20px; font-size: 14px; margin-top: 10px;">Test URL</button>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+        function extractGoogleMapsUrl(input) {
+            const googleMapsPatterns = [
+                /maps\.app\.goo\.gl\/[A-Za-z0-9]+/,
+                /google\.com\/maps/,
+                /goo\.gl\/maps/
+            ];
+
+            const isGoogleMapsUrl = googleMapsPatterns.some(pattern => pattern.test(input));
+
+            if (isGoogleMapsUrl) {
+                if (input.includes('maps.app.goo.gl') || input.includes('goo.gl')) {
+                    return input.startsWith('http') ? input : `https://${input}`;
+                }
+                if (input.includes('google.com/maps')) {
+                    return input;
+                }
+            }
+
+            return null;
+        }
+
+        function testURL() {
+            const input = document.getElementById('locationInput').value;
+            const result = extractGoogleMapsUrl(input);
+
+            const resultDiv = document.getElementById('result');
+
+            if (result) {
+                resultDiv.innerHTML = `
+                    <div class="test pass">
+                        <h3>✅ Google Maps URL Detected!</h3>
+                        <p><strong>Input:</strong> <code>${input}</code></p>
+                        <p><strong>Extracted URL:</strong> <code>${result}</code></p>
+                        <div class="preview">
+                            <strong>Map Preview (what you should see):</strong><br/>
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2">
+                                <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            <p>Google Maps Location Detected</p>
+                            <p><a href="${result}" target="_blank">Click to view full map →</a></p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="test fail">
+                        <h3>❌ Not a Google Maps URL</h3>
+                        <p><strong>Input:</strong> <code>${input}</code></p>
+                        <p>This will be saved as a plain text address.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Auto-test on load
+        window.onload = testURL;
+    </script>
+
+    <div style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+        <h3>Supported URL Formats:</h3>
+        <ul>
+            <li><code>https://maps.app.goo.gl/KTsfhJb3dyPuTaZV8</code> ✅</li>
+            <li><code>maps.app.goo.gl/KTsfhJb3dyPuTaZV8</code> ✅ (auto-adds https://)</li>
+            <li><code>https://goo.gl/maps/xyz</code> ✅</li>
+            <li><code>https://www.google.com/maps/...</code> ✅</li>
+            <li><code>Nairobi, Kenya</code> ❌ (plain text, no preview)</li>
+        </ul>
+    </div>
+</body>
+</html>
