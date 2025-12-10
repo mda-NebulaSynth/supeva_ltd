@@ -152,24 +152,30 @@ export const SetupPasswordPage = () => {
                 console.log('➕ Creating new admin profile...');
                 const { error: profileError } = await supabase
                     .from('admin_profiles')
-                    .insert({
-                        user_id: user.id,
-                        email: user.email,
-                        full_name: fullName.trim(),
-                        role: 'staff',
-                        is_active: true,
-                        is_developer: false,
-                        invited_at: new Date().toISOString(),
-                        accepted_at: new Date().toISOString(),
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    });
+                    .upsert(
+                        {
+                            user_id: user.id,
+                            email: user.email,
+                            full_name: fullName.trim(),
+                            role: 'staff',
+                            is_active: true,
+                            is_developer: false,
+                            invited_at: new Date().toISOString(),
+                            accepted_at: new Date().toISOString(),
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        },
+                        {
+                            onConflict: 'email', // or 'user_id' if that's your unique column
+                            ignoreDuplicates: false
+                        }
+                    );
 
                 if (profileError) {
                     console.error('Profile creation error:', profileError);
 
                     // If duplicate error, try to update instead
-                    if (profileError.code === '23505' || profileError.message.includes('duplicate')) {
+                    if (profileError.code === '409' || profileError.message.includes('duplicate')) {
                         console.log('🔄 Duplicate detected, trying update...');
                         const { error: updateError } = await supabase
                             .from('admin_profiles')
