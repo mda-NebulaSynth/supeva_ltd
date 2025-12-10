@@ -2,13 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Lock, CheckCircle, AlertCircle, User, Mail } from 'lucide-react';
-import { Lock, CheckCircle, AlertCircle, User, Mail } from 'lucide-react';
 
 export const SetupPasswordPage = () => {
     const navigate = useNavigate();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [fullName, setFullName] = useState('');
     const [fullName, setFullName] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
@@ -100,12 +98,6 @@ export const SetupPasswordPage = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-
-        // Validation
-        if (!fullName.trim()) {
-            setError('Please enter your full name');
-            return;
-        }
 
         // Validation
         if (!fullName.trim()) {
@@ -211,14 +203,11 @@ export const SetupPasswordPage = () => {
             setSuccess(true);
 
             // 6. Redirect to admin after 2 seconds
-            // 6. Redirect to admin after 2 seconds
             setTimeout(() => {
                 navigate('/admin');
             }, 2000);
 
         } catch (err: any) {
-            console.error('Setup error:', err);
-            setError(err.message || 'Failed to complete setup. Please try again.');
             console.error('Setup error:', err);
             setError(err.message || 'Failed to complete setup. Please try again.');
         } finally {
@@ -251,9 +240,6 @@ export const SetupPasswordPage = () => {
                     <h2 className="text-2xl font-bold mb-4">Setup Complete!</h2>
                     <p className="text-gray-600 mb-2">Your account has been successfully configured.</p>
                     <p className="text-gray-500 text-sm mb-6">Redirecting to admin dashboard...</p>
-                    <h2 className="text-2xl font-bold mb-4">Setup Complete!</h2>
-                    <p className="text-gray-600 mb-2">Your account has been successfully configured.</p>
-                    <p className="text-gray-500 text-sm mb-6">Redirecting to admin dashboard...</p>
                     <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
                 </div>
             </div>
@@ -262,21 +248,11 @@ export const SetupPasswordPage = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-accent-50 p-4">
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-accent-50 p-4">
             <div className="max-w-md w-full card-glass p-8">
                 <div className="text-center mb-8">
                     <div className="w-16 h-16 bg-gradient-to-br from-primary-600 to-accent-600 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Lock className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-3xl font-bold mb-2">Complete Your Setup</h2>
-                    <p className="text-gray-600">Finish setting up your administrator account</p>
-
-                    {userEmail && (
-                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg inline-flex items-center gap-2">
-                            <Mail className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm text-blue-800">{userEmail}</span>
-                        </div>
-                    )}
                     <h2 className="text-3xl font-bold mb-2">Complete Your Setup</h2>
                     <p className="text-gray-600">Finish setting up your administrator account</p>
 
@@ -363,28 +339,11 @@ export const SetupPasswordPage = () => {
                         </ul>
                     </div>
 
-                    <div className="text-sm text-gray-600 space-y-2">
-                        <p className="font-medium">Requirements:</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                            <li>At least 6 characters</li>
-                            <li>Make it memorable but secure</li>
-                            <li>Your name will be displayed in the admin panel</li>
-                        </ul>
-                    </div>
-
                     <button
                         type="submit"
                         disabled={loading || !userEmail}
                         className="w-full btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {loading ? (
-                            <>
-                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Completing Setup...
-                            </>
-                        ) : (
-                            'Complete Setup & Continue'
-                        )}
                         {loading ? (
                             <>
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
