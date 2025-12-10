@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             const { data, error } = await supabase
                 .from('admin_profiles')
                 .select('*')
-                .eq('id', userId)
+                .eq('user_id', userId)
                 .single();
 
             console.log('📦 Supabase response - data:', data, 'error:', error);
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
             console.log('🔄 Initializing auth...');
             const { data: { session }, error } = await supabase.auth.getSession();
-            
+
             if (error) {
                 console.error('❌ Error getting session:', error);
             } else {
@@ -124,7 +124,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
-                    await fetchProfile(session.user.id);
+                    // Check if this is a new invited user
+                    const hash = window.location.hash;
+                    const isNewInvitedUser = hash.includes('access_token') && hash.includes('type=invite');
+
+                    if (isNewInvitedUser) {
+                        console.log('🎯 New invited user - skipping profile check');
+                        // Don't fetch profile yet - it doesn't exist
+                        setProfile(null);
+                    } else {
+                        await fetchProfile(session.user.id);
+                    }
                 }
             }
         } catch (error) {
@@ -144,7 +154,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
                 console.log('👂 Auth state changed:', _event, session?.user?.id);
-                
+
                 // Update session and user state
                 setSession(session);
                 setUser(session?.user ?? null);
