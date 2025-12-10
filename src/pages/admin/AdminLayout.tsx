@@ -13,7 +13,6 @@ import {
     X,
     Clock,
     Shield,
-    UserCog
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,7 +34,6 @@ const navItems: NavItem[] = [
     { path: '/admin/project-updates', label: 'Project Updates', icon: Clock },
     { path: '/admin/blog', label: 'Blog Posts', icon: FileText },
     { path: '/admin/team', label: 'Public Team', icon: Users },
-    { path: '/admin/team-management', label: 'System Admins', icon: UserCog, requiredRole: 'founder_only' },
     { path: '/admin/ads', label: 'Ad Banners', icon: Image },
     { path: '/admin/testimonials', label: 'Testimonials', icon: Star },
     { path: '/admin/contacts', label: 'Contact Submissions', icon: MessageSquare }
@@ -117,9 +115,8 @@ export const AdminLayout = () => {
             </motion.header>
 
             <motion.aside
-                className={`fixed left-0 top-16 bottom-0 w-64 bg-white shadow-lg z-30 transition-transform duration-300 ${
-                    sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-                } lg:translate-x-0`}
+                className={`fixed left-0 top-16 bottom-0 w-64 bg-white shadow-lg z-30 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                    } lg:translate-x-0`}
                 initial="hidden"
                 animate="visible"
                 variants={fadeInLeft}
@@ -138,9 +135,8 @@ export const AdminLayout = () => {
                             >
                                 <Link
                                     to={item.path}
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                                        isActive ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'
-                                    }`}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'
+                                        }`}
                                 >
                                     <Icon className="w-5 h-5" />
                                     <span className="font-medium">{item.label}</span>
