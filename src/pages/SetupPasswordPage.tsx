@@ -137,7 +137,7 @@ export const SetupPasswordPage = () => {
             const { data: existingProfile, error: profileCheckError } = await supabase
                 .from('admin_profiles')
                 .select('*')
-                .eq('email', user.email)
+                .eq('user_id', user.id)
                 .maybeSingle(); // ← CRITICAL CHANGE HERE
 
             if (profileCheckError && profileCheckError.code !== 'PGRST116') {
@@ -186,7 +186,7 @@ export const SetupPasswordPage = () => {
                                 updated_at: new Date().toISOString(),
                                 is_active: true
                             })
-                            .eq('email', user.email);
+                            .eq('user_id', user.id);
 
                         if (updateError) {
                             console.error('Update failed:', updateError);
@@ -213,7 +213,7 @@ export const SetupPasswordPage = () => {
                         updated_at: new Date().toISOString(),
                         is_active: true
                     })
-                    .eq('email', user.email); // Use email as identifier
+                    .eq('user_id', user.id); // Use user_id as identifier
 
                 if (updateError) {
                     console.error('Profile update error:', updateError);
@@ -229,7 +229,7 @@ export const SetupPasswordPage = () => {
             const { data: verifiedProfile } = await supabase
                 .from('admin_profiles')
                 .select('*')
-                .eq('email', user.email)
+                .eq('user_id', user.id)
                 .maybeSingle();
 
             if (verifiedProfile) {
