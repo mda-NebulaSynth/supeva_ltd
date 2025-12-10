@@ -16,6 +16,7 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
 
     console.log('🔐 ProtectedRoute - loading:', loading, 'user:', user?.id, 'profile:', profile?.id, 'isDeveloper:', isDeveloper, 'isFounder:', isFounder, 'isActiveAdmin:', isActiveAdmin);
 
+<<<<<<< HEAD
     // Check for hash invitation at the VERY BEGINNING (before any other logic)
     const hash = window.location.hash;
     if (hash && hash.includes('access_token') && hash.includes('type=invite')) {
@@ -30,14 +31,23 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
         return null;
     }
 
+=======
+>>>>>>> 5241935401d2f0b5c2c1e69037a667e4c9d7abc7
     // Check if user just accepted invitation (no password set yet)
     useEffect(() => {
         if (user && !loading && !profile) {
             // Check if this is a new invited user by looking for access token in URL
+<<<<<<< HEAD
             const currentHash = window.location.hash;
             const params = new URLSearchParams(window.location.search);
 
             const hasAccessToken = currentHash.includes('access_token') || params.has('access_token');
+=======
+            const hash = window.location.hash;
+            const params = new URLSearchParams(window.location.search);
+
+            const hasAccessToken = hash.includes('access_token') || params.has('access_token');
+>>>>>>> 5241935401d2f0b5c2c1e69037a667e4c9d7abc7
             const hasTypeInvite = params.get('type') === 'invite';
 
             if (hasAccessToken || hasTypeInvite) {
