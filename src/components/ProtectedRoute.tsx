@@ -1,6 +1,8 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth, type AdminRole } from '../contexts/AuthContext';
 import { AlertTriangle, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface ProtectedRouteProps {
     children?: React.ReactNode;
@@ -10,8 +12,29 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, requiredRole, requireFounder = false }: ProtectedRouteProps) => {
     const { user, profile, loading, isDeveloper, isFounder, isActiveAdmin } = useAuth();
+    const navigate = useNavigate();
 
     console.log('🔐 ProtectedRoute - loading:', loading, 'user:', user?.id, 'profile:', profile?.id, 'isDeveloper:', isDeveloper, 'isFounder:', isFounder, 'isActiveAdmin:', isActiveAdmin);
+
+    // Check if user just accepted invitation (no password set yet)
+    useEffect(() => {
+        if (user && !loading && !profile) {
+            // Check if this is a new invited user by looking for access token in URL
+            const hash = window.location.hash;
+            const params = new URLSearchParams(window.location.search);
+
+            const hasAccessToken = hash.includes('access_token') || params.has('access_token');
+            const hasTypeInvite = params.get('type') === 'invite';
+
+            if (hasAccessToken || hasTypeInvite) {
+                console.log('🎯 New invited user detected, redirecting to setup-password');
+                // Clear the URL hash/query to prevent infinite redirects
+                window.history.replaceState(null, '', '/setup-password');
+                navigate('/setup-password', { replace: true });
+                return;
+            }
+        }
+    }, [user, loading, profile, navigate]);
 
     // Developers bypass all restrictions
     if (isDeveloper && profile) {
@@ -38,13 +61,18 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
         );
     }
 
+    // If we're redirecting to setup-password, show nothing
+    if (user && !profile && (window.location.hash.includes('access_token') || new URLSearchParams(window.location.search).has('access_token'))) {
+        return null;
+    }
+
     // Not authenticated - redirect to login
     if (!user) {
         console.log('🔒 ProtectedRoute - No user, redirecting to login');
         return <Navigate to="/login" replace />;
     }
 
-    // No admin profile found - show error
+    // No admin profile found (and not a new invite) - show error
     if (!profile) {
         console.log('🚫 ProtectedRoute - No profile found');
         return (
@@ -56,7 +84,7 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-3">Access Restricted</h2>
                         <p className="text-gray-600 mb-6 leading-relaxed">
-                            Your account doesn't have administrator privileges or may have been deactivated. 
+                            Your account doesn't have administrator privileges or may have been deactivated.
                             Please contact a system administrator to request access.
                         </p>
                         <div className="space-y-3">
@@ -67,10 +95,13 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
                                 Try Again
                             </button>
                             <button
-                                onClick={() => window.location.href = '/'}
+                                onClick={() => {
+                                    supabase.auth.signOut();
+                                    window.location.href = '/';
+                                }}
                                 className="btn bg-gray-100 hover:bg-gray-200 text-gray-800 w-full"
                             >
-                                Return to Homepage
+                                Sign Out
                             </button>
                         </div>
                         <p className="text-sm text-gray-500 mt-6 pt-6 border-t">
@@ -94,14 +125,17 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-3">Account Suspended</h2>
                         <p className="text-gray-600 mb-6 leading-relaxed">
-                            Your administrator account has been temporarily suspended. 
+                            Your administrator account has been temporarily suspended.
                             This may be due to inactivity or security reasons.
                         </p>
                         <button
-                            onClick={() => window.location.href = '/'}
+                            onClick={() => {
+                                supabase.auth.signOut();
+                                window.location.href = '/';
+                            }}
                             className="btn btn-primary w-full"
                         >
-                            Contact Support
+                            Sign Out
                         </button>
                     </div>
                 </div>
@@ -124,7 +158,7 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
                             This section requires founder-level permissions. You're currently logged in as {profile.role}.
                         </p>
                         <button
-                            onClick={() => window.location.href = '/admin/dashboard'}
+                            onClick={() => navigate('/admin/dashboard')}
                             className="btn btn-primary w-full"
                         >
                             Go to Dashboard
@@ -151,7 +185,7 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
                             Your current role is <span className="font-semibold text-gray-700">{profile.role}</span>.
                         </p>
                         <button
-                            onClick={() => window.location.href = '/admin/dashboard'}
+                            onClick={() => navigate('/admin/dashboard')}
                             className="btn btn-primary w-full"
                         >
                             Return to Dashboard
