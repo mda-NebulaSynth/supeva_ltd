@@ -133,12 +133,17 @@ export const SetupPasswordPage = () => {
 
             console.log('👤 User:', user.email);
 
-            // 3. Check if profile already exists
-            const { data: existingProfile } = await supabase
+            // 3. Check if profile already exists - USE .maybeSingle() NOT .single()
+            const { data: existingProfile, error: profileCheckError } = await supabase
                 .from('admin_profiles')
                 .select('*')
                 .eq('email', user.email)
-                .single();
+                .maybeSingle(); // ← CRITICAL CHANGE HERE
+
+            if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+                console.error('Profile check error:', profileCheckError);
+                // Continue anyway - we'll try to create/update
+            }
 
             console.log('📊 Existing profile:', existingProfile ? 'Yes' : 'No');
 
@@ -162,22 +167,47 @@ export const SetupPasswordPage = () => {
 
                 if (profileError) {
                     console.error('Profile creation error:', profileError);
-                    // Don't throw - the password was set successfully
-                    console.log('⚠️ Profile creation failed, but password was set');
+
+                    // If duplicate error, try to update instead
+                    if (profileError.code === '23505' || profileError.message.includes('duplicate')) {
+                        console.log('🔄 Duplicate detected, trying update...');
+                        const { error: updateError } = await supabase
+                            .from('admin_profiles')
+                            .update({
+                                user_id: user.id,
+                                full_name: fullName.trim(),
+                                accepted_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString(),
+                                is_active: true
+                            })
+                            .eq('email', user.email);
+
+                        if (updateError) {
+                            console.error('Update failed:', updateError);
+                            // Don't throw - password was set successfully
+                            console.log('⚠️ Profile update failed, but password was set');
+                        } else {
+                            console.log('✅ Duplicate profile updated');
+                        }
+                    } else {
+                        console.log('⚠️ Profile creation failed, but password was set');
+                    }
                 } else {
                     console.log('✅ Admin profile created');
                 }
             } else {
-                // Profile exists, update it with the name
+                // Profile exists, update it with the name and user_id
                 console.log('✏️ Updating existing profile...');
                 const { error: updateError } = await supabase
                     .from('admin_profiles')
                     .update({
+                        user_id: user.id, // Ensure user_id is set
                         full_name: fullName.trim(),
                         accepted_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
+                        updated_at: new Date().toISOString(),
+                        is_active: true
                     })
-                    .eq('id', existingProfile.id);
+                    .eq('email', user.email); // Use email as identifier
 
                 if (updateError) {
                     console.error('Profile update error:', updateError);
@@ -186,11 +216,27 @@ export const SetupPasswordPage = () => {
                 }
             }
 
-            // 5. Success!
+            // 5. Wait a moment for database to sync, then verify profile exists
+            console.log('⏳ Verifying profile creation...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const { data: verifiedProfile } = await supabase
+                .from('admin_profiles')
+                .select('*')
+                .eq('email', user.email)
+                .maybeSingle();
+
+            if (verifiedProfile) {
+                console.log('✅ Profile verified successfully:', verifiedProfile);
+            } else {
+                console.log('⚠️ Profile not found after creation attempt');
+            }
+
+            // 6. Success!
             console.log('🎉 Setup complete!');
             setSuccess(true);
 
-            // 6. Redirect to admin after 2 seconds
+            // 7. Redirect to admin after 2 seconds
             setTimeout(() => {
                 navigate('/admin');
             }, 2000);

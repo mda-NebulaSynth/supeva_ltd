@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 .from('admin_profiles')
                 .select('*')
                 .eq('user_id', userId)
-                .single();
+                .maybeSingle();
 
             console.log('📦 Supabase response - data:', data, 'error:', error);
 
