@@ -63,46 +63,51 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const isActiveAdmin = profile?.is_active === true || isDeveloper;
 
     const fetchProfile = async (userId: string) => {
-        try {
-            console.log('🔍 Fetching profile for user:', userId);
+    try {
+        console.log('🔍 Fetching profile for user:', userId);
 
-            const { data, error } = await supabase
-                .from('admin_profiles')
-                .select('*')
-                .eq('user_id', userId)
-                .maybeSingle();
+        // Search by user_id (direct foreign key)
+        const { data, error } = await supabase
+            .from('admin_profiles')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
 
-            console.log('📦 Supabase response - data:', data, 'error:', error);
+        console.log('📦 Supabase response - data:', data, 'error:', error);
 
-            if (error) {
+        if (error) {
+            if (error.code === 'PGRST116') {
+                console.log('🆕 No admin profile found for user:', userId);
+            } else {
                 console.error('❌ Error fetching admin profile:', error);
-                setProfile(null);
-                return;
             }
-
-            if (!data) {
-                console.error('⚠️ No admin profile found for user:', userId);
-                setProfile(null);
-                return;
-            }
-
-            const profileData = data as AdminProfile;
-            console.log('✅ Profile fetched successfully:', profileData);
-
-            // Allow developers to bypass is_active check
-            if (profileData.role !== 'developer' && !profileData.is_active) {
-                console.warn('⚠️ Admin account is inactive');
-                setProfile(null);
-                return;
-            }
-
-            console.log('🎉 Setting profile state:', profileData);
-            setProfile(profileData);
-        } catch (error) {
-            console.error('💥 Exception in fetchProfile:', error);
             setProfile(null);
+            return;
         }
-    };
+
+        if (!data) {
+            console.log('⚠️ No admin profile found for user:', userId);
+            setProfile(null);
+            return;
+        }
+
+        const profileData = data as AdminProfile;
+        console.log('✅ Profile fetched successfully:', profileData);
+
+        // Allow developers to bypass is_active check
+        if (profileData.role !== 'developer' && !profileData.is_active) {
+            console.warn('⚠️ Admin account is inactive');
+            setProfile(null);
+            return;
+        }
+
+        console.log('🎉 Setting profile state:', profileData);
+        setProfile(profileData);
+    } catch (error) {
+        console.error('💥 Exception in fetchProfile:', error);
+        setProfile(null);
+    }
+};
 
     const refreshProfile = async () => {
         if (user) {
