@@ -12,87 +12,78 @@ export const SetupPasswordPage = () => {
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
     const [userEmail, setUserEmail] = useState('');
-    const [initializing, setInitializing] = useState(true);
+    const [isProcessingHash, setIsProcessingHash] = useState(true);
 
     useEffect(() => {
-        const initializeAuth = async () => {
+        const processInvitation = async () => {
             try {
-                console.log('🔗 Initializing auth from URL...');
+                console.log('🎯 Processing invitation hash...');
 
-                // Get the current URL
-                const currentUrl = window.location.href;
-                console.log('Current URL:', currentUrl);
-
-                // Parse the hash from the URL
-                const hashIndex = currentUrl.indexOf('#');
-                let accessToken: string | null = null;
-                let refreshToken: string | null = null;
-                let tokenType: string | null = null;
-
-                if (hashIndex !== -1) {
-                    const hash = currentUrl.substring(hashIndex + 1);
-                    console.log('Hash found:', hash.substring(0, 50) + '...');
-
-                    // Parse hash parameters
-                    const params = new URLSearchParams(hash);
-                    accessToken = params.get('access_token');
-                    refreshToken = params.get('refresh_token');
-                    tokenType = params.get('type');
-
-                    console.log('Access token present:', !!accessToken);
-                    console.log('Token type:', tokenType);
+                // Get hash from URL
+                const hash = window.location.hash.substring(1);
+                if (!hash) {
+                    console.log('❌ No hash found, checking existing session');
+                    checkExistingSession();
+                    return;
                 }
 
-                // If we have an access token, set the session
-                if (accessToken && refreshToken) {
-                    console.log('🔄 Setting session with tokens...');
+                const params = new URLSearchParams(hash);
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                const type = params.get('type');
+
+                if (accessToken && type === 'invite') {
+                    console.log('🔑 Setting session from invitation tokens');
+
+                    // IMPORTANT: Set session WITHOUT waiting for AuthContext
                     const { data: { session }, error: sessionError } = await supabase.auth.setSession({
                         access_token: accessToken,
-                        refresh_token: refreshToken
+                        refresh_token: refreshToken || ''
                     });
 
                     if (sessionError) {
                         console.error('Session error:', sessionError);
                         setError('Invalid invitation link. Please request a new one.');
+                        setIsProcessingHash(false);
                         return;
                     }
 
                     if (session?.user) {
-                        console.log('✅ Session set, user:', session.user.email);
+                        console.log('✅ Session set for:', session.user.email);
                         setUserEmail(session.user.email || '');
 
-                        // Pre-fill name from user metadata if available
+                        // Pre-fill name if available
                         if (session.user.user_metadata?.full_name) {
                             setFullName(session.user.user_metadata.full_name);
                         }
 
-                        // Clean the URL - remove the hash
+                        // CRITICAL: Clean the URL IMMEDIATELY
                         window.history.replaceState(null, '', '/setup-password');
                         console.log('🗑️ URL cleaned');
                     }
                 } else {
-                    // No tokens in URL, check if user is already logged in
-                    console.log('🔍 No tokens in URL, checking existing session...');
-                    const { data: { user } } = await supabase.auth.getUser();
-
-                    if (user) {
-                        console.log('✅ User already logged in:', user.email);
-                        setUserEmail(user.email || '');
-                    } else {
-                        console.log('❌ No user found, redirecting to login');
-                        navigate('/login');
-                        return;
-                    }
+                    console.log('⚠️ No valid invitation tokens found');
+                    checkExistingSession();
                 }
-            } catch (error) {
-                console.error('Initialization error:', error);
-                setError('Failed to initialize. Please try again.');
+            } catch (err) {
+                console.error('Error processing invitation:', err);
+                setError('Failed to process invitation. Please try again.');
             } finally {
-                setInitializing(false);
+                setIsProcessingHash(false);
             }
         };
 
-        initializeAuth();
+        const checkExistingSession = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserEmail(user.email || '');
+            } else {
+                // No user found, redirect to login
+                navigate('/login');
+            }
+        };
+
+        processInvitation();
     }, [navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -171,11 +162,8 @@ export const SetupPasswordPage = () => {
 
                 if (profileError) {
                     console.error('Profile creation error:', profileError);
-                    // Check if it's a duplicate error
-                    if (!profileError.message.includes('duplicate key')) {
-                        throw profileError;
-                    }
-                    console.log('⚠️ Duplicate profile, continuing...');
+                    // Don't throw - the password was set successfully
+                    console.log('⚠️ Profile creation failed, but password was set');
                 } else {
                     console.log('✅ Admin profile created');
                 }
@@ -215,15 +203,15 @@ export const SetupPasswordPage = () => {
         }
     };
 
-    if (initializing) {
+    if (isProcessingHash) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-accent-50">
                 <div className="max-w-md w-full card-glass p-8 text-center">
                     <div className="w-16 h-16 bg-gradient-to-br from-primary-600 to-accent-600 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Lock className="w-8 h-8 text-white animate-pulse" />
                     </div>
-                    <h2 className="text-2xl font-bold mb-4">Initializing...</h2>
-                    <p className="text-gray-600 mb-6">Setting up your invitation...</p>
+                    <h2 className="text-2xl font-bold mb-4">Processing Invitation...</h2>
+                    <p className="text-gray-600 mb-6">Setting up your account access</p>
                     <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
                 </div>
             </div>

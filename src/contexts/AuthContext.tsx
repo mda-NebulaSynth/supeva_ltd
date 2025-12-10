@@ -155,6 +155,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             async (_event, session) => {
                 console.log('👂 Auth state changed:', _event, session?.user?.id);
 
+                // CRITICAL: Skip if we're on the setup-password page
+                if (window.location.pathname.includes('/setup-password')) {
+                    console.log('⏭️ Skipping auth update on setup-password page');
+                    return;
+                }
+
                 // Update session and user state
                 setSession(session);
                 setUser(session?.user ?? null);
