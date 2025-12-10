@@ -154,7 +154,7 @@ export const SetupPasswordPage = () => {
                     .from('admin_profiles')
                     .upsert(
                         {
-                            user_id: user.id,
+                            user_id: user.id,           // ← this is your true unique key
                             email: user.email,
                             full_name: fullName.trim(),
                             role: 'staff',
@@ -166,7 +166,7 @@ export const SetupPasswordPage = () => {
                             updated_at: new Date().toISOString()
                         },
                         {
-                            onConflict: 'email', // or 'user_id' if that's your unique column
+                            onConflict: 'user_id',      // ← conflict on user_id, not email
                             ignoreDuplicates: false
                         }
                     );
