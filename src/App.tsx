@@ -20,6 +20,7 @@ import { BannersManager } from './pages/admin/BannersManager';
 import { TestimonialsManager } from './pages/admin/TestimonialsManager';
 import { ContactsManager } from './pages/admin/ContactsManager';
 import { ProjectUpdatesManager } from './pages/admin/ProjectUpdatesManager';
+import { SetupPasswordPage } from './pages/SetupPasswordPage';
 
 // Placeholder pages - to be implemented
 const NotFoundPage = () => <div className="section container-custom text-center"><h1 className="text-6xl font-bold text-primary-600">404</h1><p className="mt-4 text-xl">Page not found</p></div>;
@@ -43,6 +44,7 @@ function App() {
 
           {/* Auth Routes (No Layout) */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/setup-password" element={<SetupPasswordPage />} />
 
           {/* Protected Admin Routes */}
           <Route element={<ProtectedRoute />}>

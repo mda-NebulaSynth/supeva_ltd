@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 import { SEO } from '../components/SEO';
+import { supabase } from '../lib/supabase';
 
 export const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -19,7 +20,22 @@ export const LoginPage = () => {
 
         try {
             const { error } = await signIn(email, password);
+
             if (error) {
+                // Check if error is "Invalid login credentials"
+                if (error.message.includes('Invalid login credentials')) {
+                    // Check if user exists but might not have password set
+                    const { data: user } = await supabase
+                        .from('auth.users')
+                        .select('email_confirmed_at')
+                        .eq('email', email)
+                        .single();
+
+                    if (user && user.email_confirmed_at) {
+                        setError('Password not set. Please contact the admin.');
+                        return;
+                    }
+                }
                 setError(error.message);
             } else {
                 navigate('/admin');
