@@ -16,7 +16,6 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { ProjectsManager } from './pages/admin/ProjectsManager';
 import { BlogManager } from './pages/admin/BlogManager';
 import { TeamManager } from './pages/admin/TeamManager';
-import { TeamManagement } from './pages/admin/TeamManagement';
 import { BannersManager } from './pages/admin/BannersManager';
 import { TestimonialsManager } from './pages/admin/TestimonialsManager';
 import { ContactsManager } from './pages/admin/ContactsManager';
@@ -62,7 +61,7 @@ function App() {
                 path="/admin/team-management"
                 element={
                   <ProtectedRoute requireFounder={true}>
-                    <TeamManagement />
+                    {/* <TeamManagement /> */}
                   </ProtectedRoute>
                 }
               />
