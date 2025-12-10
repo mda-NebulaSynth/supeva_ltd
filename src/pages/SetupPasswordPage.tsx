@@ -90,7 +90,7 @@ export const SetupPasswordPage = () => {
         e.preventDefault();
         setError('');
 
-        // Validation remains the same
+        // Validation (keep existing)
         if (!fullName.trim()) {
             setError('Please enter your full name');
             return;
@@ -131,162 +131,103 @@ export const SetupPasswordPage = () => {
                 throw new Error('User not found after password update');
             }
 
-            console.log('👤 User:', user.email, 'ID:', user.id);
+            console.log('👤 User:', user.email);
 
-            // 3. Check if profile already exists using BOTH user_id and email
-            console.log('🔍 Checking for existing profile...');
-
-            const { data: existingByUserId } = await supabase
-                .from('admin_profiles')
+            // 3. Check if profile already exists
+            const { data: existingProfile, error: profileCheckError } = await supabase
+                .from('profiles') // ✅ Use 'profiles'
                 .select('*')
-                .eq('user_id', user.id)
+                .eq('id', user.id) // ✅ Use 'id' column
                 .maybeSingle();
 
-            const { data: existingByEmail } = await supabase
-                .from('admin_profiles')
-                .select('*')
-                .eq('email', user.email)
-                .maybeSingle();
+            if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+                console.error('Profile check error:', profileCheckError);
+            }
 
-            const existingProfile = existingByUserId || existingByEmail;
-            console.log('📊 Existing profile found by user_id?', existingByUserId ? 'Yes' : 'No');
-            console.log('📊 Existing profile found by email?', existingByEmail ? 'Yes' : 'No');
+            console.log('📊 Existing profile:', existingProfile ? 'Yes' : 'No');
 
-            // 4. Prepare profile data WITH ALL required fields
-            const profileData = {
-                user_id: user.id,
-                email: user.email,
-                full_name: fullName.trim(),
-                role: 'staff',
-                is_active: true,
-                is_developer: false,
-                is_founder: false, // ← ADD THIS - it's in your table structure
-                invited_at: new Date().toISOString(),
-                accepted_at: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            };
+            if (!existingProfile) {
+                // 4. Create profile for this user
+                console.log('➕ Creating new profile...');
+                const { error: profileError } = await supabase
+                    .from('profiles') // ✅ Use 'profiles'
+                    .upsert({
+                        id: user.id,           // ✅ Use 'id' which references auth.users.id
+                        email: user.email,
+                        full_name: fullName.trim(),
+                        role: 'staff',
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'id',      // ✅ Conflict on 'id'
+                        ignoreDuplicates: false
+                    });
 
-            console.log('📝 Profile data prepared:', profileData);
+                if (profileError) {
+                    console.error('Profile creation error:', profileError);
 
-            let profileCreated = false;
-
-            if (existingProfile) {
-                // 5a. Update existing profile
-                console.log('✏️ Updating existing profile...');
-
-                // Remove fields that shouldn't be updated
-                const updateData = {
-                    ...profileData,
-                    // Don't update created_at if it already exists
-                    created_at: existingProfile.created_at || profileData.created_at
-                };
-                delete updateData.id; // Don't try to update the id
-
-                const { error: updateError } = await supabase
-                    .from('admin_profiles')
-                    .update(updateData)
-                    .eq('id', existingProfile.id);
-
-                if (updateError) {
-                    console.error('❌ Update error:', updateError);
-                    throw new Error(`Failed to update profile: ${updateError.message}`);
-                }
-
-                profileCreated = true;
-                console.log('✅ Existing profile updated');
-            } else {
-                // 5b. Create new profile with multiple fallback strategies
-                console.log('➕ Creating new admin profile...');
-
-                // Strategy 1: Try simple insert
-                const { error: insertError } = await supabase
-                    .from('admin_profiles')
-                    .insert([profileData]);
-
-                if (insertError) {
-                    console.log('⚠️ Simple insert failed, trying upsert on user_id...', insertError);
-
-                    // Strategy 2: Try upsert on user_id
-                    const { error: upsertError } = await supabase
-                        .from('admin_profiles')
-                        .upsert(profileData, {
-                            onConflict: 'user_id',
-                            ignoreDuplicates: false
+                    // Try with insert instead of upsert
+                    const { error: insertError } = await supabase
+                        .from('profiles')
+                        .insert({
+                            id: user.id,
+                            email: user.email,
+                            full_name: fullName.trim(),
+                            role: 'staff'
                         });
 
-                    if (upsertError) {
-                        console.log('⚠️ Upsert failed, trying insert without conflict resolution...', upsertError);
-
-                        // Strategy 3: Try raw insert with error suppression
-                        try {
-                            // Use fetch API to get more detailed error info
-                            const response = await fetch(
-                                'https://tqvrtvanrqnaltnjklit.supabase.co/rest/v1/admin_profiles',
-                                {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'apikey': 'YOUR_SUPABASE_ANON_KEY',
-                                        'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY'}`
-                                    },
-                                    body: JSON.stringify(profileData)
-                                }
-                            );
-
-                            const result = await response.json();
-                            console.log('📦 Raw response:', result);
-
-                            if (!response.ok) {
-                                throw new Error(`HTTP ${response.status}: ${JSON.stringify(result)}`);
-                            }
-
-                            profileCreated = true;
-                            console.log('✅ Profile created via raw API');
-                        } catch (rawError) {
-                            console.error('❌ All creation attempts failed:', rawError);
-
-                            // Show the error to user but continue (password was set)
-                            setError(`Profile creation failed: ${rawError.message}. Password was set successfully. Contact support to complete setup.`);
-                        }
+                    if (insertError) {
+                        console.error('Insert also failed:', insertError);
+                        console.log('⚠️ Profile creation failed, but password was set');
                     } else {
-                        profileCreated = true;
-                        console.log('✅ Profile upserted successfully');
+                        console.log('✅ Profile created with insert');
                     }
                 } else {
-                    profileCreated = true;
-                    console.log('✅ Profile inserted successfully');
+                    console.log('✅ Profile created');
+                }
+            } else {
+                // Profile exists, update it
+                console.log('✏️ Updating existing profile...');
+                const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({
+                        full_name: fullName.trim(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', user.id);
+
+                if (updateError) {
+                    console.error('Profile update error:', updateError);
+                } else {
+                    console.log('✅ Profile updated');
                 }
             }
 
-            // 6. Verify profile was created
+            // 5. Verify profile
             console.log('⏳ Verifying profile creation...');
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            const { data: verifiedProfile, error: verifyError } = await supabase
-                .from('admin_profiles')
+            const { data: verifiedProfile } = await supabase
+                .from('profiles')
                 .select('*')
-                .eq('user_id', user.id)
+                .eq('id', user.id)
                 .maybeSingle();
-
-            if (verifyError) {
-                console.error('Verification error:', verifyError);
-            }
 
             if (verifiedProfile) {
                 console.log('✅ Profile verified successfully:', verifiedProfile);
-                profileCreated = true;
-            } else if (!profileCreated) {
-                console.log('⚠️ Profile not found in database after all attempts');
-                // Don't throw - at least the password was set
-                setError('Account setup partially completed. Password was set but profile creation failed. Please contact support.');
+            } else {
+                console.log('⚠️ Profile not found after creation attempt');
+                // Additional debug: try to fetch all profiles (temporarily)
+                const { data: allProfiles } = await supabase
+                    .from('profiles')
+                    .select('*');
+                console.log('📋 All profiles in table:', allProfiles);
             }
 
-            // 7. Success!
+            // 6. Success!
             console.log('🎉 Setup complete!');
             setSuccess(true);
 
-            // 8. Redirect to admin after 2 seconds
+            // 7. Redirect to admin
             setTimeout(() => {
                 navigate('/admin');
             }, 2000);
