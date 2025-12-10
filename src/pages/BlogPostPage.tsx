@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Calendar, Clock,  ArrowLeft, Share2, Eye } from 'lucide-react';
+import { Calendar, Clock, ArrowLeft, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { SEO } from '../components/SEO';
@@ -20,61 +20,12 @@ export const BlogPostPage = () => {
     const [author, setAuthor] = useState<Profile | null>(null);
     const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
     const [loading, setLoading] = useState(true);
-    const [viewCount, setViewCount] = useState(0);
 
     useEffect(() => {
         if (slug) {
             fetchPost();
         }
     }, [slug]);
-
-    const trackView = async (postId: string) => {
-        try {
-            const viewedPosts = JSON.parse(localStorage.getItem('viewedBlogPosts') || '{}');
-            const lastViewed = viewedPosts[postId];
-            const now = Date.now();
-            const oneDayInMs = 24 * 60 * 60 * 1000;
-
-            if (!lastViewed || (now - lastViewed) > oneDayInMs) {
-                // FIX: Use type assertion for blog_views
-                const { error } = await (supabase
-                    .from('blog_views')
-                    .insert([{
-                        blog_post_id: postId,
-                        viewer_ip: null,
-                        user_agent: navigator.userAgent,
-                        referrer: document.referrer || null
-                    }]) as any);
-
-                if (error) {
-                    console.debug('View tracking insert error:', error);
-                } else {
-                    // Update view count state
-                    fetchViewCount(postId);
-                }
-
-                viewedPosts[postId] = now;
-                localStorage.setItem('viewedBlogPosts', JSON.stringify(viewedPosts));
-            }
-        } catch (error) {
-            console.debug('View tracking error:', error);
-        }
-    };
-
-    const fetchViewCount = async (postId: string) => {
-        try {
-            const { count, error } = await (supabase
-                .from('blog_views')
-                .select('*', { count: 'exact', head: true })
-                .eq('blog_post_id', postId) as any);
-
-            if (!error && count !== null) {
-                setViewCount(count);
-            }
-        } catch (error) {
-            console.debug('Error fetching view count:', error);
-        }
-    };
 
     const fetchPost = async () => {
         try {
@@ -95,11 +46,7 @@ export const BlogPostPage = () => {
             const typedPost = postData as BlogPost;
             setPost(typedPost);
 
-            // Track view asynchronously
-            trackView(typedPost.id);
 
-            // Fetch view count
-            fetchViewCount(typedPost.id);
 
             // Fetch author - Use admin_profiles instead of profiles
             if (typedPost.author_id) {
@@ -289,10 +236,6 @@ export const BlogPostPage = () => {
                             <div className="flex items-center gap-2">
                                 <Clock className="w-4 h-4" />
                                 {calculateReadTime(post.content)}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Eye className="w-4 h-4" />
-                                {viewCount.toLocaleString()} {viewCount === 1 ? 'view' : 'views'}
                             </div>
                             <button
                                 onClick={handleShare}
