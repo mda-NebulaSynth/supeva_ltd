@@ -16,47 +16,64 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
 
     console.log('🔐 ProtectedRoute - loading:', loading, 'user:', user?.id, 'profile:', profile?.id, 'isDeveloper:', isDeveloper, 'isFounder:', isFounder, 'isActiveAdmin:', isActiveAdmin);
 
-    // Check for hash invitation at the VERY BEGINNING (before any other logic)
+    // Check for hash invitation at the VERY BEGINNING
     const hash = window.location.hash;
-    if (hash && hash.includes('access_token') && hash.includes('type=invite')) {
+    const params = new URLSearchParams(window.location.search);
+    
+    if ((hash && hash.includes('access_token') && hash.includes('type=invite')) || 
+        (params.has('access_token') && params.get('type') === 'invite')) {
         console.log('🔗 Hash invitation detected, redirecting to setup');
-        // Convert hash to query params for easier handling
-        const params = new URLSearchParams(hash.substring(1));
-        const newUrl = `/setup-password?${params.toString()}`;
-
-        // Replace URL and redirect
+        // Convert to proper URL
+        const newUrl = '/setup-password';
         window.history.replaceState({}, '', newUrl);
         navigate('/setup-password', { replace: true });
         return null;
     }
 
-    // Check if user just accepted invitation (no password set yet)
+    // Check if user just accepted invitation
     useEffect(() => {
         if (user && !loading && !profile) {
-            // Check if this is a new invited user by looking for access token in URL
-            const currentHash = window.location.hash;
-            const params = new URLSearchParams(window.location.search);
+            // Direct profile check as fallback
+            const checkProfileDirectly = async () => {
+                const { data: directProfile } = await supabase
+                    .from('profiles') // ✅ Use 'profiles' table
+                    .select('*')
+                    .eq('id', user.id) // ✅ Use 'id' column
+                    .maybeSingle();
+                
+                if (directProfile) {
+                    console.log('✅ Found profile via direct check');
+                    // Profile exists but wasn't loaded in context
+                    // This could happen if user just completed setup
+                    window.location.reload(); // Refresh to update auth context
+                    return;
+                }
 
-            const hasAccessToken = currentHash.includes('access_token') || params.has('access_token');
-            const hasTypeInvite = params.get('type') === 'invite';
+                // Check if this is a new invited user
+                const currentHash = window.location.hash;
+                const params = new URLSearchParams(window.location.search);
+                const hasAccessToken = currentHash.includes('access_token') || params.has('access_token');
+                const hasTypeInvite = params.get('type') === 'invite';
 
-            if (hasAccessToken || hasTypeInvite) {
-                console.log('🎯 New invited user detected, redirecting to setup-password');
-                // Clear the URL hash/query to prevent infinite redirects
-                window.history.replaceState(null, '', '/setup-password');
-                navigate('/setup-password', { replace: true });
-                return;
-            }
+                if (hasAccessToken || hasTypeInvite) {
+                    console.log('🎯 New invited user detected, redirecting to setup-password');
+                    window.history.replaceState(null, '', '/setup-password');
+                    navigate('/setup-password', { replace: true });
+                    return;
+                }
+            };
+
+            checkProfileDirectly();
         }
     }, [user, loading, profile, navigate]);
 
-    // Developers bypass all restrictions
+    // Developers bypass all restrictions (if profile exists)
     if (isDeveloper && profile) {
         console.log('✅ ProtectedRoute - Developer bypass activated!');
         return children ? <>{children}</> : <Outlet />;
     }
 
-    // Show loading state with timeout protection
+    // Show loading state
     if (loading) {
         console.log('⏳ ProtectedRoute - Loading...');
         return (
@@ -76,7 +93,7 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
     }
 
     // If we're redirecting to setup-password, show nothing
-    if (user && !profile && (window.location.hash.includes('access_token') || new URLSearchParams(window.location.search).has('access_token'))) {
+    if (user && !profile && (window.location.hash.includes('access_token') || params.has('access_token'))) {
         return null;
     }
 
@@ -86,9 +103,24 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
         return <Navigate to="/login" replace />;
     }
 
-    // No admin profile found (and not a new invite) - show error
+    // No profile found (and not a new invite)
     if (!profile) {
         console.log('🚫 ProtectedRoute - No profile found');
+        
+        // Last attempt: direct check
+        useEffect(() => {
+            const directProfileCheck = async () => {
+                const { data: directProfile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .maybeSingle();
+                
+                console.log('🔍 Direct profile check result:', directProfile);
+            };
+            directProfileCheck();
+        }, [user?.id]);
+
         return (
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
                 <div className="max-w-md w-full animate-fade-in">
@@ -121,36 +153,6 @@ export const ProtectedRoute = ({ children, requiredRole, requireFounder = false 
                         <p className="text-sm text-gray-500 mt-6 pt-6 border-t">
                             User ID: {user.id}
                         </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Account is inactive (except developers who already bypassed)
-    if (!isActiveAdmin) {
-        console.log('🚫 ProtectedRoute - Account inactive');
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
-                <div className="max-w-md w-full animate-fade-in">
-                    <div className="card p-8 text-center shadow-xl border border-yellow-200">
-                        <div className="w-20 h-20 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                            <AlertTriangle className="w-10 h-10 text-yellow-600" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-3">Account Suspended</h2>
-                        <p className="text-gray-600 mb-6 leading-relaxed">
-                            Your administrator account has been temporarily suspended.
-                            This may be due to inactivity or security reasons.
-                        </p>
-                        <button
-                            onClick={() => {
-                                supabase.auth.signOut();
-                                window.location.href = '/';
-                            }}
-                            className="btn btn-primary w-full"
-                        >
-                            Sign Out
-                        </button>
                     </div>
                 </div>
             </div>

@@ -5,16 +5,12 @@ import { supabase } from '../lib/supabase';
 export type AdminRole = 'developer' | 'founder' | 'staff';
 
 export interface AdminProfile {
-    id: string;
+    id: string; // This matches the user's id from auth.users
     email: string;
     full_name: string;
     role: AdminRole;
-    avatar_url: string | null;
-    is_active: boolean;
-    is_developer: boolean;
-    invited_by: string | null;
-    invited_at: string | null;
-    accepted_at: string | null;
+    is_active?: boolean;
+    is_developer?: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -57,57 +53,50 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
     // Derived states for role checks
-    const isDeveloper = profile?.role === 'developer' && profile?.is_developer === true;
-    const isFounder = profile?.role === 'founder' && profile?.is_active === true;
-    const isStaff = profile?.role === 'staff' && profile?.is_active === true;
-    const isActiveAdmin = profile?.is_active === true || isDeveloper;
+    const isDeveloper = profile?.role === 'developer';
+    const isFounder = profile?.role === 'founder';
+    const isStaff = profile?.role === 'staff';
+    const isActiveAdmin = Boolean(profile); // If profile exists, user is active
 
     const fetchProfile = async (userId: string) => {
-    try {
-        console.log('🔍 Fetching profile for user:', userId);
+        try {
+            console.log('🔍 Fetching profile for user:', userId);
 
-        // Search by user_id (direct foreign key)
-        const { data, error } = await supabase
-            .from('admin_profiles')
-            .select('*')
-            .eq('user_id', userId)
-            .maybeSingle();
+            // IMPORTANT: Use 'profiles' table and match by 'id' column
+            const { data, error } = await supabase
+                .from('profiles') // ✅ Changed from 'admin_profiles' to 'profiles'
+                .select('*')
+                .eq('id', userId) // ✅ Changed from 'user_id' to 'id'
+                .maybeSingle();
 
-        console.log('📦 Supabase response - data:', data, 'error:', error);
+            console.log('📦 Supabase response - data:', data, 'error:', error);
 
-        if (error) {
-            if (error.code === 'PGRST116') {
-                console.log('🆕 No admin profile found for user:', userId);
-            } else {
-                console.error('❌ Error fetching admin profile:', error);
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    console.log('🆕 No profile found for user:', userId);
+                } else {
+                    console.error('❌ Error fetching profile:', error);
+                }
+                setProfile(null);
+                return;
             }
+
+            if (!data) {
+                console.log('⚠️ No profile found for user:', userId);
+                setProfile(null);
+                return;
+            }
+
+            const profileData = data as AdminProfile;
+            console.log('✅ Profile fetched successfully:', profileData);
+
+            console.log('🎉 Setting profile state:', profileData);
+            setProfile(profileData);
+        } catch (error) {
+            console.error('💥 Exception in fetchProfile:', error);
             setProfile(null);
-            return;
         }
-
-        if (!data) {
-            console.log('⚠️ No admin profile found for user:', userId);
-            setProfile(null);
-            return;
-        }
-
-        const profileData = data as AdminProfile;
-        console.log('✅ Profile fetched successfully:', profileData);
-
-        // Allow developers to bypass is_active check
-        if (profileData.role !== 'developer' && !profileData.is_active) {
-            console.warn('⚠️ Admin account is inactive');
-            setProfile(null);
-            return;
-        }
-
-        console.log('🎉 Setting profile state:', profileData);
-        setProfile(profileData);
-    } catch (error) {
-        console.error('💥 Exception in fetchProfile:', error);
-        setProfile(null);
-    }
-};
+    };
 
     const refreshProfile = async () => {
         if (user) {
@@ -115,7 +104,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
     };
 
-    // Get initial session WITHOUT async/await to avoid hanging
+    // Get initial session
     const initializeAuth = async () => {
         try {
             console.log('🔄 Initializing auth...');
@@ -131,11 +120,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 if (session?.user) {
                     // Check if this is a new invited user
                     const hash = window.location.hash;
-                    const isNewInvitedUser = hash.includes('access_token') && hash.includes('type=invite');
+                    const params = new URLSearchParams(window.location.search);
+                    const isNewInvitedUser = 
+                        (hash.includes('access_token') && hash.includes('type=invite')) ||
+                        (params.has('access_token') && params.get('type') === 'invite');
 
                     if (isNewInvitedUser) {
                         console.log('🎯 New invited user - skipping profile check');
-                        // Don't fetch profile yet - it doesn't exist
                         setProfile(null);
                     } else {
                         await fetchProfile(session.user.id);
@@ -155,12 +146,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         // Initialize auth
         initializeAuth();
 
-        // Listen for auth changes - FIXED: Use proper event handling
+        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
                 console.log('👂 Auth state changed:', _event, session?.user?.id);
 
-                // CRITICAL: Skip if we're on the setup-password page
+                // Skip if we're on the setup-password page
                 if (window.location.pathname.includes('/setup-password')) {
                     console.log('⏭️ Skipping auth update on setup-password page');
                     return;
@@ -188,7 +179,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             console.log('🧹 Cleaning up auth subscription');
             subscription.unsubscribe();
         };
-    }, []); // Empty dependency array - we only run this once
+    }, []);
 
     const signIn = async (email: string, password: string) => {
         setLoading(true);
