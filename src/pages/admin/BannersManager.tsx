@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, ExternalLink, ToggleLeft, ToggleRight, MapPin, Info, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, ExternalLink, ToggleLeft, ToggleRight, MapPin, Info, Image as ImageIcon, AlertCircle, Link, Globe, Upload, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
 import { StaggeredList, StaggeredItem } from '../../components/animated/StaggeredList';
@@ -23,6 +23,11 @@ export const BannersManager = () => {
         link_url: '',
         active: true
     });
+    const [errors, setErrors] = useState<{
+        slot_id?: string;
+        image_url?: string;
+        link_url?: string;
+    }>({});
 
     useEffect(() => {
         fetchBanners();
@@ -45,11 +50,40 @@ export const BannersManager = () => {
         }
     };
 
+    const validateForm = () => {
+        const newErrors: typeof errors = {};
+
+        if (!formData.slot_id.trim()) {
+            newErrors.slot_id = 'Banner location is required';
+        }
+
+        if (!formData.image_url.trim()) {
+            newErrors.image_url = 'Banner image is required';
+        }
+
+        if (!formData.link_url.trim()) {
+            newErrors.link_url = 'Destination URL is required';
+        } else if (!isValidUrl(formData.link_url)) {
+            newErrors.link_url = 'Please enter a valid URL (e.g., https://example.com)';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const isValidUrl = (url: string) => {
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.image_url) {
-            alert('Please upload a banner image');
+        if (!validateForm()) {
             return;
         }
 
@@ -91,6 +125,7 @@ export const BannersManager = () => {
                 link_url: '',
                 active: true
             });
+            setErrors({});
             setShowForm(false);
             setEditingBanner(null);
             fetchBanners();
@@ -128,11 +163,12 @@ export const BannersManager = () => {
             link_url: banner.link_url,
             active: banner.active
         });
+        setErrors({});
         setShowForm(true);
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this banner?')) return;
+        if (!confirm('Are you sure you want to delete this banner? This action cannot be undone.')) return;
 
         try {
             const banner = banners.find(b => b.id === id);
@@ -163,6 +199,7 @@ export const BannersManager = () => {
             link_url: '',
             active: true
         });
+        setErrors({});
     };
 
     const isSlotOccupied = (slotId: string): boolean => {
@@ -172,123 +209,177 @@ export const BannersManager = () => {
     const selectedSlot = formData.slot_id ? getBannerSlot(formData.slot_id) : null;
 
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 md:space-y-8">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-4xl font-display font-bold mb-2">Ad Banners</h1>
-                    <p className="text-gray-600">Manage advertisement banners across your website</p>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">Ad Banners</h1>
+                    <p className="text-sm sm:text-base text-gray-600">Manage advertisement banners across your website</p>
                 </div>
                 <button
                     onClick={() => setShowForm(true)}
-                    className="btn btn-primary flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 active:scale-95"
                 >
                     <Plus className="w-5 h-5" />
-                    Add Banner
+                    <span className="text-sm sm:text-base">Add Banner</span>
                 </button>
             </div>
 
+            {/* Form */}
             {showForm && (
                 <motion.div
-                    initial={{ opacity: 0, y: -20 }}
+                    initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="card p-6"
+                    className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 sm:p-6"
                 >
-                    <h2 className="text-2xl font-bold mb-6">
-                        {editingBanner ? 'Edit Banner' : 'Create New Banner'}
-                    </h2>
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                            {editingBanner ? 'Edit Banner' : 'Create New Banner'}
+                        </h2>
+                        <button
+                            onClick={handleCancel}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            aria-label="Close form"
+                        >
+                            <X className="w-5 h-5 text-gray-500" />
+                        </button>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Banner Location */}
                         <div>
-                            <label className="block text-sm font-medium mb-2">
-                                Banner Location *
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Banner Location <span className="text-red-500">*</span>
                             </label>
-                            <select
-                                value={formData.slot_id}
-                                onChange={(e) => setFormData({ ...formData, slot_id: e.target.value })}
-                                className="input"
-                                required
-                            >
-                                <option value="">-- Select where to display this banner --</option>
-                                {BANNER_SLOTS.map((slot) => {
-                                    const occupied = isSlotOccupied(slot.id);
-                                    return (
-                                        <option
-                                            key={slot.id}
-                                            value={slot.id}
-                                            disabled={occupied}
-                                        >
-                                            {slot.label} {occupied ? '(Already in use)' : ''}
-                                        </option>
-                                    );
-                                })}
-                            </select>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="relative">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                                    <MapPin className="w-5 h-5 text-gray-400" />
+                                </div>
+                                <select
+                                    value={formData.slot_id}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, slot_id: e.target.value });
+                                        if (errors.slot_id) setErrors({ ...errors, slot_id: undefined });
+                                    }}
+                                    className={`w-full pl-12 pr-4 py-3.5 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${errors.slot_id ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-300'}`}
+                                    required
+                                >
+                                    <option value="">-- Select where to display this banner --</option>
+                                    {BANNER_SLOTS.map((slot) => {
+                                        const occupied = isSlotOccupied(slot.id);
+                                        return (
+                                            <option
+                                                key={slot.id}
+                                                value={slot.id}
+                                                disabled={occupied}
+                                                className={occupied ? 'text-gray-400' : ''}
+                                            >
+                                                {slot.label} {occupied ? '(Already in use)' : ''}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+                            {errors.slot_id && (
+                                <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    <span>{errors.slot_id}</span>
+                                </div>
+                            )}
+                            <p className="mt-2 text-xs text-gray-500">
                                 Choose where visitors will see this banner on your website
                             </p>
                         </div>
 
+                        {/* Slot Information */}
                         {selectedSlot && (
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                 <div className="flex items-start gap-3">
-                                    <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                                    <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                                     <div className="flex-1">
-                                        <h4 className="font-semibold text-blue-900 mb-2">
+                                        <h4 className="font-semibold text-blue-900 mb-3">
                                             {selectedSlot.label}
                                         </h4>
-                                        <div className="space-y-2 text-sm text-blue-800">
+                                        <div className="space-y-3 text-sm text-blue-800">
                                             <div className="flex items-center gap-2">
-                                                <MapPin className="w-4 h-4" />
-                                                <span><strong>Page:</strong> {selectedSlot.page}</span>
+                                                <span className="font-medium">Page:</span>
+                                                <span>{selectedSlot.page}</span>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <ImageIcon className="w-4 h-4" />
-                                                <span>
-                                                    <strong>Recommended Size:</strong> {selectedSlot.recommendedSize.width} × {selectedSlot.recommendedSize.height}px
-                                                    <span className="ml-2 text-xs bg-blue-100 px-2 py-0.5 rounded">
-                                                        Ratio {selectedSlot.aspectRatio}
-                                                    </span>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-medium">Recommended Size:</span>
+                                                <span className="px-2 py-1 bg-blue-100 rounded text-xs font-mono">
+                                                    {selectedSlot.recommendedSize.width} × {selectedSlot.recommendedSize.height}px
+                                                </span>
+                                                <span className="px-2 py-1 bg-blue-200 rounded text-xs">
+                                                    Ratio {selectedSlot.aspectRatio}
                                                 </span>
                                             </div>
-                                            <p className="italic">{selectedSlot.description}</p>
-                                            <p className="text-xs mt-2">
-                                                <strong>Location:</strong> {selectedSlot.location}
-                                            </p>
+                                            <p className="italic border-t border-blue-300 pt-3 mt-3">{selectedSlot.description}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
+                        {/* Destination URL */}
                         <div>
-                            <label className="block text-sm font-medium mb-2">
-                                Destination URL *
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Destination URL <span className="text-red-500">*</span>
                             </label>
-                            <input
-                                type="url"
-                                value={formData.link_url}
-                                onChange={(e) => setFormData({ ...formData, link_url: e.target.value })}
-                                placeholder="https://example.com/your-offer"
-                                className="input"
-                                required
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
+                            <div className="relative">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                                    <Link className="w-5 h-5 text-gray-400" />
+                                </div>
+                                <input
+                                    type="url"
+                                    value={formData.link_url}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, link_url: e.target.value });
+                                        if (errors.link_url) setErrors({ ...errors, link_url: undefined });
+                                    }}
+                                    placeholder="https://example.com/your-offer"
+                                    className={`w-full pl-12 pr-4 py-3.5 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${errors.link_url ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-300'}`}
+                                    required
+                                />
+                            </div>
+                            {errors.link_url && (
+                                <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    <span>{errors.link_url}</span>
+                                </div>
+                            )}
+                            <p className="mt-2 text-xs text-gray-500">
                                 Where visitors go when they click the banner
                             </p>
                         </div>
 
+                        {/* Banner Image */}
                         <div>
-                            <label className="block text-sm font-medium mb-2">
-                                Banner Image *
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Banner Image <span className="text-red-500">*</span>
                             </label>
                             {selectedSlot && (
-                                <div className="mb-3 text-sm text-gray-600 bg-gray-50 p-3 rounded">
-                                    For best results, upload an image sized {selectedSlot.recommendedSize.width} × {selectedSlot.recommendedSize.height}px
+                                <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                                    <div className="flex items-center gap-3">
+                                        <ImageIcon className="w-5 h-5 text-gray-600 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-700 mb-1">
+                                                Recommended Size
+                                            </p>
+                                            <p className="text-xs text-gray-600">
+                                                For best results, upload an image sized {selectedSlot.recommendedSize.width} × {selectedSlot.recommendedSize.height}px
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
+                            
                             <MediaUpload
                                 images={formData.image_url ? [formData.image_url] : []}
                                 videos={[]}
                                 onImagesChange={(images) => {
                                     setFormData({ ...formData, image_url: images[0] || '' });
+                                    if (errors.image_url) setErrors({ ...errors, image_url: undefined });
                                 }}
                                 onVideosChange={() => { }}
                                 maxMedia={1}
@@ -296,71 +387,85 @@ export const BannersManager = () => {
                                 bucketName="ads"
                                 showVideos={false}
                             />
-                            {!formData.image_url && (
-                                <p className="text-xs text-red-500 mt-1">* Banner image is required</p>
+                            {errors.image_url && (
+                                <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    <span>{errors.image_url}</span>
+                                </div>
                             )}
                         </div>
 
+                        {/* Live Preview */}
                         {formData.image_url && (
                             <div>
-                                <label className="block text-sm font-medium mb-2">
-                                    Live Preview
-                                </label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-gray-100">
-                                    <p className="text-xs text-gray-500 mb-4 text-center font-medium">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Globe className="w-5 h-5 text-gray-700" />
+                                    <label className="text-sm font-medium text-gray-700">Live Preview</label>
+                                </div>
+                                <div className="border border-gray-300 rounded-xl p-4 sm:p-6 bg-gradient-to-br from-gray-50 to-gray-100">
+                                    <p className="text-xs text-gray-600 mb-4 text-center font-medium">
                                         This is how your banner will appear to visitors
                                     </p>
-                                    <div className="max-w-4xl mx-auto">
-                                        <div className="relative overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 bg-white">
-                                            <img
-                                                src={formData.image_url}
-                                                alt="Banner preview"
-                                                className="w-full h-auto"
-                                            />
-                                            <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm text-white text-xs rounded-md">
-                                                Sponsored
+                                    <div className="relative overflow-hidden rounded-lg shadow-lg bg-white">
+                                        <img
+                                            src={formData.image_url}
+                                            alt="Banner preview"
+                                            className="w-full h-auto max-h-[200px] sm:max-h-[250px] object-contain"
+                                        />
+                                        <div className="absolute top-3 right-3 px-2 py-1 bg-black/70 backdrop-blur-sm text-white text-xs rounded-md">
+                                            Sponsored
+                                        </div>
+                                    </div>
+
+                                    {formData.link_url && (
+                                        <div className="mt-4 p-3 bg-white rounded-lg border border-gray-200">
+                                            <div className="flex items-center gap-2 text-xs text-gray-600">
+                                                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                                <span className="truncate">
+                                                    Click destination: <span className="font-mono text-blue-600">{formData.link_url}</span>
+                                                </span>
                                             </div>
                                         </div>
-
-                                        {formData.link_url && (
-                                            <p className="text-xs text-gray-600 mt-3 text-center flex items-center justify-center gap-1">
-                                                <ExternalLink className="w-3 h-3" />
-                                                Clicking this banner will open: <span className="font-mono text-primary-600">{formData.link_url}</span>
-                                            </p>
-                                        )}
-                                        {selectedSlot && (
-                                            <div className="mt-4 p-3 bg-white rounded-lg border border-gray-200">
-                                                <p className="text-xs text-gray-600 text-center">
-                                                    <strong>Display Location:</strong> {selectedSlot.label} ({selectedSlot.page})
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         )}
 
-                        <div className="flex items-center gap-2">
+                        {/* Active Toggle */}
+                        <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <input
                                 type="checkbox"
                                 id="active"
                                 checked={formData.active ?? true}
                                 onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                                className="w-4 h-4"
+                                className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                             />
-                            <label htmlFor="active" className="text-sm font-medium">
-                                Active (Display banner on website immediately)
-                            </label>
+                            <div className="flex-1">
+                                <label htmlFor="active" className="text-sm font-medium text-gray-900 cursor-pointer">
+                                    Active Banner
+                                </label>
+                                <p className="text-xs text-gray-600 mt-1">
+                                    Display this banner immediately on the website
+                                </p>
+                            </div>
+                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${formData.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {formData.active ? 'ON' : 'OFF'}
+                            </div>
                         </div>
 
-                        <div className="flex gap-3 pt-4">
-                            <button type="submit" className="btn btn-primary">
+                        {/* Form Actions */}
+                        <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+                            <button 
+                                type="submit" 
+                                className="w-full sm:flex-1 px-6 py-3.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 active:scale-95"
+                            >
+                                <Upload className="w-5 h-5" />
                                 {editingBanner ? 'Update Banner' : 'Create Banner'}
                             </button>
                             <button
                                 type="button"
                                 onClick={handleCancel}
-                                className="btn bg-gray-200 hover:bg-gray-300"
+                                className="w-full sm:w-auto px-6 py-3.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors active:scale-95"
                             >
                                 Cancel
                             </button>
@@ -369,13 +474,14 @@ export const BannersManager = () => {
                 </motion.div>
             )}
 
+            {/* Available Locations */}
             {!showForm && (
-                <div className="card p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
-                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 sm:p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                         <MapPin className="w-5 h-5 text-blue-600" />
                         Available Banner Locations
                     </h3>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {BANNER_SLOTS.map((slot) => {
                             const occupied = isSlotOccupied(slot.id);
                             return (
@@ -383,25 +489,30 @@ export const BannersManager = () => {
                                     key={slot.id}
                                     className={`p-4 rounded-lg border-2 transition-all ${occupied
                                             ? 'bg-green-50 border-green-200'
-                                            : 'bg-white border-gray-200 hover:border-blue-300'
+                                            : 'bg-gray-50 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
                                         }`}
                                 >
-                                    <div className="flex items-start justify-between mb-2">
-                                        <h4 className="font-semibold text-sm">{slot.label}</h4>
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div>
+                                            <h4 className="font-semibold text-gray-900 text-sm mb-1">{slot.label}</h4>
+                                            <p className="text-xs text-gray-600">{slot.page}</p>
+                                        </div>
                                         {occupied ? (
-                                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full whitespace-nowrap">
                                                 Active
                                             </span>
                                         ) : (
-                                            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                            <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded-full whitespace-nowrap">
                                                 Available
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-xs text-gray-600 mb-2">{slot.page}</p>
-                                    <p className="text-xs text-gray-500">
-                                        {slot.recommendedSize.width} × {slot.recommendedSize.height}px
-                                    </p>
+                                    <div className="space-y-2">
+                                        <div className="text-xs text-gray-700">
+                                            <span className="font-medium">Size:</span> {slot.recommendedSize.width} × {slot.recommendedSize.height}px
+                                        </div>
+                                        <p className="text-xs text-gray-500 leading-relaxed">{slot.description}</p>
+                                    </div>
                                 </div>
                             );
                         })}
@@ -409,38 +520,41 @@ export const BannersManager = () => {
                 </div>
             )}
 
+            {/* Loading State */}
             {loading ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="card p-6 animate-pulse">
-                            <div className="h-48 bg-gray-200 rounded mb-4"></div>
-                            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div key={i} className="bg-white rounded-xl shadow border border-gray-200 p-6 animate-pulse">
+                            <div className="h-48 bg-gray-200 rounded-lg mb-4"></div>
+                            <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+                            <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+                            <div className="h-10 bg-gray-200 rounded"></div>
                         </div>
                     ))}
                 </div>
             ) : banners.length === 0 ? (
-                <div className="card p-12 text-center">
-                    <ImageIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                    <p className="text-gray-500 text-lg mb-4">No banners created yet</p>
-                    <p className="text-gray-400 text-sm mb-6">
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 sm:p-12 text-center">
+                    <ImageIcon className="w-16 h-16 mx-auto text-gray-300 mb-6" />
+                    <p className="text-lg font-medium text-gray-900 mb-3">No banners created yet</p>
+                    <p className="text-gray-600 mb-8 max-w-md mx-auto">
                         Create your first banner to start displaying ads on your website
                     </p>
                     <button
                         onClick={() => setShowForm(true)}
-                        className="btn btn-primary inline-flex items-center gap-2"
+                        className="inline-flex items-center gap-2 px-6 py-3.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors active:scale-95"
                     >
                         <Plus className="w-5 h-5" />
                         Create Your First Banner
                     </button>
                 </div>
             ) : (
-                <StaggeredList className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <StaggeredList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {banners.map((banner) => {
                         const slotInfo = getBannerSlot(banner.slot_id);
                         return (
                             <StaggeredItem key={banner.id}>
-                                <div className="card p-6">
+                                <div className="bg-white rounded-xl shadow border border-gray-200 p-4 sm:p-6">
+                                    {/* Banner Image */}
                                     <div className="relative mb-4 rounded-lg overflow-hidden bg-gray-100 group">
                                         <img
                                             src={banner.image_url}
@@ -448,20 +562,21 @@ export const BannersManager = () => {
                                             className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
                                         />
                                         {!banner.active && (
-                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                                <span className="px-3 py-1 bg-red-500 text-white rounded-full text-sm font-medium">
+                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                <span className="px-3 py-1.5 bg-red-500 text-white rounded-full text-xs font-medium">
                                                     Inactive
                                                 </span>
                                             </div>
                                         )}
                                     </div>
 
-                                    <div className="mb-4">
-                                        <h3 className="font-bold text-lg mb-1">
+                                    {/* Banner Info */}
+                                    <div className="mb-5">
+                                        <h3 className="font-bold text-gray-900 text-lg mb-2">
                                             {slotInfo?.label || banner.slot_id}
                                         </h3>
                                         {slotInfo && (
-                                            <p className="text-xs text-gray-500 mb-2">
+                                            <p className="text-xs text-gray-500 mb-3">
                                                 {slotInfo.page} • {slotInfo.recommendedSize.width} × {slotInfo.recommendedSize.height}px
                                             </p>
                                         )}
@@ -469,44 +584,47 @@ export const BannersManager = () => {
                                             href={banner.link_url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1 hover:underline"
+                                            className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2 hover:underline truncate"
                                         >
-                                            {banner.link_url.substring(0, 35)}...
-                                            <ExternalLink className="w-3 h-3" />
+                                            <Link className="w-4 h-4 flex-shrink-0" />
+                                            <span className="truncate">{banner.link_url}</span>
                                         </a>
                                     </div>
 
+                                    {/* Action Buttons */}
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => toggleActive(banner)}
-                                            className={`flex-1 btn ${banner.active
-                                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                            className={`flex-1 px-3 py-2.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm ${banner.active
+                                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
                                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                } flex items-center justify-center gap-2 text-sm`}
+                                                }`}
                                         >
                                             {banner.active ? (
                                                 <>
                                                     <ToggleRight className="w-4 h-4" />
-                                                    Active
+                                                    <span className="hidden sm:inline">Active</span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <ToggleLeft className="w-4 h-4" />
-                                                    Inactive
+                                                    <span className="hidden sm:inline">Inactive</span>
                                                 </>
                                             )}
                                         </button>
                                         <button
                                             onClick={() => handleEdit(banner)}
-                                            className="btn bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                            className="w-10 h-10 flex items-center justify-center bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors"
                                             title="Edit banner"
+                                            aria-label="Edit banner"
                                         >
                                             <Edit className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(banner.id)}
-                                            className="btn bg-red-100 text-red-700 hover:bg-red-200"
+                                            className="w-10 h-10 flex items-center justify-center bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors"
                                             title="Delete banner"
+                                            aria-label="Delete banner"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>

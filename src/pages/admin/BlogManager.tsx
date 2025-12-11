@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, AlertCircle, FileText, Link, Tag, Type, Globe, Image as ImageIcon, X, Eye, EyeOff, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +28,13 @@ export const BlogManager = () => {
         seo_title: '',
         seo_description: '',
     });
+    const [errors, setErrors] = useState<{
+        title?: string;
+        slug?: string;
+        excerpt?: string;
+        content?: string;
+        featured_image?: string;
+    }>({});
 
     useEffect(() => {
         fetchPosts();
@@ -50,8 +57,41 @@ export const BlogManager = () => {
         }
     };
 
+    const validateForm = () => {
+        const newErrors: typeof errors = {};
+
+        if (!formData.title?.trim()) {
+            newErrors.title = 'Blog post title is required';
+        }
+
+        if (!formData.slug?.trim()) {
+            newErrors.slug = 'URL slug is required';
+        } else if (!/^[a-z0-9-]+$/.test(formData.slug)) {
+            newErrors.slug = 'Slug can only contain lowercase letters, numbers, and hyphens';
+        }
+
+        if (!formData.excerpt?.trim()) {
+            newErrors.excerpt = 'Short excerpt is required';
+        }
+
+        if (!formData.content?.trim()) {
+            newErrors.content = 'Blog content is required';
+        }
+
+        if (!formData.featured_image?.trim()) {
+            newErrors.featured_image = 'Featured image is required';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!validateForm()) {
+            return;
+        }
 
         try {
             if (editingPost) {
@@ -100,26 +140,24 @@ export const BlogManager = () => {
             setShowModal(false);
             setEditingPost(null);
             resetForm();
+            setErrors({});
             fetchPosts();
         } catch (error) {
             console.error('Error saving blog post:', error);
-            alert('Failed to save blog post');
+            alert('Failed to save blog post. Please try again.');
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this blog post?')) return;
+        if (!confirm('Are you sure you want to delete this blog post? This action cannot be undone.')) return;
 
         try {
-            // Find the post to get its image URL before deletion
             const post = posts.find(p => p.id === id);
 
-            // Delete featured image from storage first if it exists
             if (post?.featured_image) {
                 await deleteImageFromStorage(post.featured_image);
             }
 
-            // Then delete from database
             const { error } = await supabase
                 .from('blog_posts')
                 .delete()
@@ -129,7 +167,7 @@ export const BlogManager = () => {
             fetchPosts();
         } catch (error) {
             console.error('Error deleting blog post:', error);
-            alert('Failed to delete blog post');
+            alert('Failed to delete blog post. Please try again.');
         }
     };
 
@@ -147,6 +185,7 @@ export const BlogManager = () => {
             seo_title: post.seo_title,
             seo_description: post.seo_description,
         });
+        setErrors({});
         setShowModal(true);
     };
 
@@ -178,6 +217,7 @@ export const BlogManager = () => {
             title,
             slug: generateSlug(title),
         });
+        if (errors.title) setErrors({ ...errors, title: undefined });
     };
 
     const filteredPosts = posts.filter(post =>
@@ -187,12 +227,12 @@ export const BlogManager = () => {
     );
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Blog Posts</h1>
-                    <p className="text-gray-600 mt-2">Manage your blog content</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Blog Posts</h1>
+                    <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">Manage your blog content</p>
                 </div>
                 <button
                     onClick={() => {
@@ -200,7 +240,7 @@ export const BlogManager = () => {
                         resetForm();
                         setShowModal(true);
                     }}
-                    className="btn btn-primary"
+                    className="w-full sm:w-auto px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 active:scale-95"
                 >
                     <Plus className="w-5 h-5" />
                     New Post
@@ -210,74 +250,122 @@ export const BlogManager = () => {
             {/* Search */}
             <div className="mb-6">
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Search posts..."
+                        placeholder="Search posts by title, excerpt, or tags..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     />
                 </div>
             </div>
 
             {/* Posts Grid */}
             {loading ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {[1, 2, 3, 4, 5, 6].map(i => (
-                        <div key={i} className="bg-white rounded-xl shadow-sm animate-pulse">
+                        <div key={i} className="bg-white rounded-xl shadow border border-gray-200 animate-pulse">
                             <div className="h-48 bg-gray-200 rounded-t-xl"></div>
-                            <div className="p-6 space-y-4">
+                            <div className="p-4 sm:p-6 space-y-3">
                                 <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                                 <div className="h-4 bg-gray-200 rounded"></div>
+                                <div className="h-10 bg-gray-200 rounded mt-4"></div>
                             </div>
                         </div>
                     ))}
                 </div>
             ) : filteredPosts.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-xl shadow-sm">
-                    <p className="text-xl text-gray-500">No blog posts found</p>
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 sm:p-12 text-center">
+                    <FileText className="w-16 h-16 mx-auto text-gray-300 mb-6" />
+                    <p className="text-lg font-medium text-gray-900 mb-3">No blog posts found</p>
+                    <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                        {searchQuery ? 'No posts match your search' : 'Create your first blog post to get started'}
+                    </p>
+                    {searchQuery ? (
+                        <button
+                            onClick={() => setSearchQuery('')}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors active:scale-95"
+                        >
+                            Clear Search
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                setEditingPost(null);
+                                resetForm();
+                                setShowModal(true);
+                            }}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors active:scale-95"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Create First Post
+                        </button>
+                    )}
                 </div>
             ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {filteredPosts.map(post => (
-                        <div key={post.id} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                            <img
-                                src={post.featured_image}
-                                alt={post.title}
-                                className="w-full h-48 object-cover"
-                            />
-                            <div className="p-6">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded ${post.status === 'published'
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-yellow-100 text-yellow-700'
+                        <div key={post.id} className="bg-white rounded-xl shadow border border-gray-200 hover:shadow-lg transition-shadow overflow-hidden">
+                            {/* Image */}
+                            <div className="relative h-48 bg-gray-100">
+                                {post.featured_image ? (
+                                    <img
+                                        src={post.featured_image}
+                                        alt={post.title}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
+                                        <ImageIcon className="w-12 h-12 text-gray-400" />
+                                    </div>
+                                )}
+                                <div className="absolute top-3 right-3">
+                                    <span className={`px-3 py-1.5 text-xs font-medium rounded-full ${post.status === 'published'
+                                        ? 'bg-green-100 text-green-800 border border-green-200'
+                                        : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
                                         }`}>
-                                        {post.status}
+                                        {post.status === 'published' ? 'Published' : 'Draft'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-4 sm:p-6">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Calendar className="w-4 h-4 text-gray-400" />
+                                    <span className="text-xs text-gray-500">
+                                        {new Date(post.created_at).toLocaleDateString()}
                                     </span>
                                     {post.tags && post.tags.length > 0 && (
-                                        <span className="text-xs text-gray-500">
-                                            {post.tags.length} tag{post.tags.length !== 1 ? 's' : ''}
+                                        <span className="ml-auto text-xs text-gray-500 flex items-center gap-1">
+                                            <Tag className="w-3 h-3" />
+                                            {post.tags.length}
                                         </span>
                                     )}
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">
+
+                                <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-2">
                                     {post.title}
                                 </h3>
                                 <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                                     {post.excerpt}
                                 </p>
+
+                                {/* Action Buttons */}
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => handleEdit(post)}
-                                        className="flex-1 btn btn-secondary text-sm"
+                                        className="flex-1 px-3 py-2.5 bg-blue-100 text-blue-700 font-medium rounded-lg hover:bg-blue-200 transition-colors flex items-center justify-center gap-2 text-sm active:scale-95"
                                     >
                                         <Edit2 className="w-4 h-4" />
-                                        Edit
+                                        <span className="hidden sm:inline">Edit</span>
                                     </button>
                                     <button
                                         onClick={() => handleDelete(post.id)}
-                                        className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                                        className="w-10 h-10 flex items-center justify-center bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors active:scale-95"
+                                        title="Delete post"
+                                        aria-label="Delete post"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
@@ -290,152 +378,304 @@ export const BlogManager = () => {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-                    <div className="bg-white rounded-2xl max-w-4xl w-full my-8">
-                        <div className="p-6 border-b">
-                            <h2 className="text-2xl font-bold">
-                                {editingPost ? 'Edit Blog Post' : 'Create New Blog Post'}
-                            </h2>
+                <div className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-50 overflow-y-auto">
+                    <div className="bg-white rounded-2xl max-w-4xl w-full my-4 sm:my-8 shadow-2xl">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+                            <div>
+                                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                                    {editingPost ? 'Edit Blog Post' : 'Create New Blog Post'}
+                                </h2>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    Fill in all required fields marked with *
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowModal(false);
+                                    setEditingPost(null);
+                                    resetForm();
+                                    setErrors({});
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                aria-label="Close modal"
+                            >
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                            <div className="grid md:grid-cols-2 gap-4">
+
+                        {/* Modal Form */}
+                        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                            {/* Title & Slug */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Title */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Title *
+                                        Title <span className="text-red-500">*</span>
                                     </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.title}
-                                        onChange={(e) => handleTitleChange(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                                    />
+                                    <div className="relative">
+                                        <Type className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            required
+                                            value={formData.title}
+                                            onChange={(e) => handleTitleChange(e.target.value)}
+                                            className={`w-full pl-12 pr-4 py-3.5 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${errors.title ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-300'}`}
+                                            placeholder="Enter blog post title"
+                                        />
+                                    </div>
+                                    {errors.title && (
+                                        <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                            <span>{errors.title}</span>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* Slug */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Slug *
+                                        URL Slug <span className="text-red-500">*</span>
                                     </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.slug}
-                                        onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                                    />
+                                    <div className="relative">
+                                        <Link className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            required
+                                            value={formData.slug}
+                                            onChange={(e) => {
+                                                setFormData({ ...formData, slug: e.target.value });
+                                                if (errors.slug) setErrors({ ...errors, slug: undefined });
+                                            }}
+                                            className={`w-full pl-12 pr-4 py-3.5 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${errors.slug ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-300'}`}
+                                            placeholder="url-friendly-slug"
+                                        />
+                                    </div>
+                                    {errors.slug && (
+                                        <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                            <span>{errors.slug}</span>
+                                        </div>
+                                    )}
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        Used in the URL: /blog/<span className="font-mono">{formData.slug || 'your-slug'}</span>
+                                    </p>
                                 </div>
                             </div>
 
+                            {/* Excerpt */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Excerpt *
+                                    Short Excerpt <span className="text-red-500">*</span>
                                 </label>
-                                <textarea
-                                    required
-                                    value={formData.excerpt}
-                                    onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
-                                    rows={3}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                                />
+                                <div className="relative">
+                                    <FileText className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
+                                    <textarea
+                                        required
+                                        value={formData.excerpt}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, excerpt: e.target.value });
+                                            if (errors.excerpt) setErrors({ ...errors, excerpt: undefined });
+                                        }}
+                                        rows={3}
+                                        className={`w-full pl-12 pr-4 py-3.5 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none ${errors.excerpt ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-300'}`}
+                                        placeholder="Write a brief summary of your blog post"
+                                    />
+                                </div>
+                                {errors.excerpt && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                        <span>{errors.excerpt}</span>
+                                    </div>
+                                )}
+                                <p className="mt-2 text-xs text-gray-500">
+                                    A short preview text shown in blog listings (150-200 characters recommended)
+                                </p>
                             </div>
 
+                            {/* Content */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Content *
+                                    Content <span className="text-red-500">*</span>
                                 </label>
-                                <textarea
-                                    required
-                                    value={formData.content}
-                                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                                    rows={10}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                                />
+                                <div className="relative">
+                                    <FileText className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
+                                    <textarea
+                                        required
+                                        value={formData.content}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, content: e.target.value });
+                                            if (errors.content) setErrors({ ...errors, content: undefined });
+                                        }}
+                                        rows={12}
+                                        className={`w-full pl-12 pr-4 py-3.5 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-y ${errors.content ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-300'}`}
+                                        placeholder="Write your blog post content here..."
+                                    />
+                                </div>
+                                {errors.content && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                        <span>{errors.content}</span>
+                                    </div>
+                                )}
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Use markdown or HTML formatting for rich content
+                                </p>
                             </div>
 
+                            {/* Featured Image */}
                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Featured Image <span className="text-red-500">*</span>
+                                </label>
+                                <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                                    <div className="flex items-center gap-3">
+                                        <ImageIcon className="w-5 h-5 text-gray-600 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-700 mb-1">
+                                                Recommended Size
+                                            </p>
+                                            <p className="text-xs text-gray-600">
+                                                Upload a high-quality image (1200 × 630px for optimal display)
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                                 <MediaUpload
                                     images={formData.featured_image ? [formData.featured_image] : []}
                                     videos={[]}
-                                    onImagesChange={(images) => setFormData({ ...formData, featured_image: images[0] || '' })}
+                                    onImagesChange={(images) => {
+                                        setFormData({ ...formData, featured_image: images[0] || '' });
+                                        if (errors.featured_image) setErrors({ ...errors, featured_image: undefined });
+                                    }}
                                     onVideosChange={() => { }}
                                     maxMedia={1}
                                     maxFileSizeMB={0.5}
                                     bucketName="blog"
                                     showVideos={false}
                                 />
-                                {!formData.featured_image && (
-                                    <p className="text-xs text-red-500 mt-1">* Featured image is required</p>
+                                {errors.featured_image && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                        <span>{errors.featured_image}</span>
+                                    </div>
                                 )}
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Tags (comma-separated)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.tags?.join(', ') || ''}
-                                    onChange={(e) => setFormData({
-                                        ...formData,
-                                        tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
-                                    })}
-                                    placeholder="Real Estate, Tips, Market Trends"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                                />
+                            {/* Tags & Status */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Tags */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Tags
+                                    </label>
+                                    <div className="relative">
+                                        <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            value={formData.tags?.join(', ') || ''}
+                                            onChange={(e) => setFormData({
+                                                ...formData,
+                                                tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
+                                            })}
+                                            placeholder="Real Estate, Tips, Market Trends"
+                                            className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                        />
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        Separate tags with commas
+                                    </p>
+                                </div>
+
+                                {/* Status */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Status <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        {formData.status === 'published' ? (
+                                            <Eye className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        ) : (
+                                            <EyeOff className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        )}
+                                        <select
+                                            value={formData.status}
+                                            onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' })}
+                                            className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none"
+                                        >
+                                            <option value="draft">Draft</option>
+                                            <option value="published">Published</option>
+                                        </select>
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        {formData.status === 'published' ? 'Post will be visible to all visitors' : 'Post is saved but not visible'}
+                                    </p>
+                                </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Status *
-                                </label>
-                                <select
-                                    value={formData.status}
-                                    onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                                >
-                                    <option value="draft">Draft</option>
-                                    <option value="published">Published</option>
-                                </select>
-                            </div>
-
-                            <div className="grid md:grid-cols-2 gap-4">
+                            {/* SEO Fields */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* SEO Title */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         SEO Title
                                     </label>
-                                    <input
-                                        type="text"
-                                        value={formData.seo_title || ''}
-                                        onChange={(e) => setFormData({ ...formData, seo_title: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                                    />
+                                    <div className="relative">
+                                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            value={formData.seo_title || ''}
+                                            onChange={(e) => setFormData({ ...formData, seo_title: e.target.value })}
+                                            className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                            placeholder="Optimized title for search engines"
+                                        />
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        Leave empty to use blog post title
+                                    </p>
                                 </div>
+
+                                {/* SEO Description */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         SEO Description
                                     </label>
-                                    <input
-                                        type="text"
-                                        value={formData.seo_description || ''}
-                                        onChange={(e) => setFormData({ ...formData, seo_description: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                                    />
+                                    <div className="relative">
+                                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            value={formData.seo_description || ''}
+                                            onChange={(e) => setFormData({ ...formData, seo_description: e.target.value })}
+                                            className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                            placeholder="Description for search engine results"
+                                        />
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        Leave empty to use excerpt
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 pt-4">
+                            {/* Form Actions */}
+                            <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setShowModal(false);
                                         setEditingPost(null);
                                         resetForm();
+                                        setErrors({});
                                     }}
-                                    className="flex-1 btn btn-secondary"
+                                    className="w-full sm:w-auto px-6 py-3.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors active:scale-95"
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit" className="flex-1 btn btn-primary">
-                                    {editingPost ? 'Update Post' : 'Create Post'}
+                                <button
+                                    type="submit"
+                                    className="w-full sm:flex-1 px-6 py-3.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 active:scale-95"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    {editingPost ? 'Update Blog Post' : 'Create Blog Post'}
                                 </button>
                             </div>
                         </form>
