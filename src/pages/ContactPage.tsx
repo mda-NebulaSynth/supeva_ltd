@@ -77,7 +77,7 @@ export const ContactPage = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-bold mb-1">Visit Us</h3>
-                                        <p className="text-gray-600">123 Real Estate Avenue, Nairobi, Kenya</p>
+                                        <p className="text-gray-600">Barbar Center, Lamu Road, Malindi, Kenya</p>
                                     </div>
                                 </div>
 
@@ -87,7 +87,7 @@ export const ContactPage = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-bold mb-1">Call Us</h3>
-                                        <p className="text-gray-600">+254 700 000 000</p>
+                                        <p className="text-gray-600">+254 725 159 164</p>
                                     </div>
                                 </div>
 
@@ -97,7 +97,7 @@ export const ContactPage = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-bold mb-1">Email Us</h3>
-                                        <p className="text-gray-600">info@supeva.com</p>
+                                        <p className="text-gray-600">muchiri@supeva.ke</p>
                                     </div>
                                 </div>
 
@@ -108,12 +108,12 @@ export const ContactPage = () => {
                                     <div>
                                         <h3 className="font-bold mb-1">WhatsApp</h3>
                                         <a
-                                            href="https://wa.me/254700000000"
+                                            href="https://wa.me/254725159164"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-gray-600 hover:text-primary-600 transition-colors duration-200"
                                         >
-                                            +254 700 000 000
+                                            +254 725 159 164
                                         </a>
                                     </div>
                                 </div>

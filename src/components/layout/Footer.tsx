@@ -1,9 +1,58 @@
 import { Link } from 'react-router-dom';
 import { Building2, Mail, Phone, MapPin, MessageCircle, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { AdSlot } from '../AdSlot';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+
+let cachedProjects: any[] = [];
+let lastFetchTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000;
 
 export const Footer = () => {
     const currentYear = new Date().getFullYear();
+    const [projects, setProjects] = useState<any[]>(cachedProjects);
+    const [loading, setLoading] = useState(!cachedProjects.length);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchProjects = async () => {
+            // Use cache if recent
+            const now = Date.now();
+            if (cachedProjects.length > 0 && now - lastFetchTime < CACHE_DURATION) {
+                setProjects(cachedProjects);
+                setLoading(false);
+                return;
+            }
+
+            try {
+                setLoading(true);
+
+                // CORRECTED QUERY: Use 'title' instead of 'name', remove 'is_featured'
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select('id, title, slug, created_at, status')
+                    .eq('status', 'active') // Only show active projects
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                if (error) throw error;
+
+                // Update cache
+                cachedProjects = data || [];
+                lastFetchTime = now;
+
+                setProjects(cachedProjects);
+            } catch (err: any) {
+                console.error('Error fetching projects:', err);
+                setError('Failed to load projects');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProjects();
+    }, []);
+
 
     return (
         <>
@@ -16,159 +65,180 @@ export const Footer = () => {
 
             <footer className="bg-gray-900 text-gray-300">
                 <div className="container-custom py-16">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-                    {/* Company Info */}
-                    <div>
-                        <Link to="/" className="flex items-center space-x-2 mb-6 group">
-                            <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-accent-600 rounded-lg flex items-center justify-center">
-                                <Building2 className="w-6 h-6 text-white" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+                        {/* Company Info */}
+                        <div>
+                            <Link to="/" className="flex items-center space-x-2 mb-6 group">
+                                <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-accent-600 rounded-lg flex items-center justify-center">
+                                    <Building2 className="w-6 h-6 text-white" />
+                                </div>
+                                <span className="text-2xl font-display font-bold text-white">
+                                    Supeva
+                                </span>
+                            </Link>
+                            <p className="text-gray-400 mb-6">
+                                Your trusted partner in finding the perfect property. Building dreams, creating homes.
+                            </p>
+                            <div className="flex space-x-4">
+                                <a
+                                    href="https://facebook.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary-600 transition-colors duration-300"
+                                >
+                                    <Facebook className="w-5 h-5" />
+                                </a>
+                                <a
+                                    href="https://twitter.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary-600 transition-colors duration-300"
+                                >
+                                    <Twitter className="w-5 h-5" />
+                                </a>
+                                <a
+                                    href="https://instagram.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary-600 transition-colors duration-300"
+                                >
+                                    <Instagram className="w-5 h-5" />
+                                </a>
+                                <a
+                                    href="https://linkedin.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary-600 transition-colors duration-300"
+                                >
+                                    <Linkedin className="w-5 h-5" />
+                                </a>
                             </div>
-                            <span className="text-2xl font-display font-bold text-white">
-                                Supeva
-                            </span>
-                        </Link>
-                        <p className="text-gray-400 mb-6">
-                            Your trusted partner in finding the perfect property. Building dreams, creating homes.
-                        </p>
-                        <div className="flex space-x-4">
-                            <a
-                                href="https://facebook.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary-600 transition-colors duration-300"
-                            >
-                                <Facebook className="w-5 h-5" />
-                            </a>
-                            <a
-                                href="https://twitter.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary-600 transition-colors duration-300"
-                            >
-                                <Twitter className="w-5 h-5" />
-                            </a>
-                            <a
-                                href="https://instagram.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary-600 transition-colors duration-300"
-                            >
-                                <Instagram className="w-5 h-5" />
-                            </a>
-                            <a
-                                href="https://linkedin.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary-600 transition-colors duration-300"
-                            >
-                                <Linkedin className="w-5 h-5" />
-                            </a>
                         </div>
-                    </div>
 
-                    {/* Quick Links */}
-                    <div>
-                        <h3 className="text-white font-display font-bold text-lg mb-6">Quick Links</h3>
-                        <ul className="space-y-3">
-                            <li>
-                                <Link to="/projects" className="hover:text-primary-400 transition-colors duration-200">
-                                    Our Projects
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/about" className="hover:text-primary-400 transition-colors duration-200">
-                                    About Us
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/team" className="hover:text-primary-400 transition-colors duration-200">
-                                    Our Team
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/blog" className="hover:text-primary-400 transition-colors duration-200">
-                                    Blog
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/contact" className="hover:text-primary-400 transition-colors duration-200">
-                                    Contact Us
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
+                        {/* Quick Links */}
+                        <div>
+                            <h3 className="text-white font-display font-bold text-lg mb-6">Quick Links</h3>
+                            <ul className="space-y-3">
+                                <li>
+                                    <Link to="/projects" className="hover:text-primary-400 transition-colors duration-200">
+                                        Our Projects
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/about" className="hover:text-primary-400 transition-colors duration-200">
+                                        About Us
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/team" className="hover:text-primary-400 transition-colors duration-200">
+                                        Our Team
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/blog" className="hover:text-primary-400 transition-colors duration-200">
+                                        Blog
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to="/contact" className="hover:text-primary-400 transition-colors duration-200">
+                                        Contact Us
+                                    </Link>
+                                </li>
+                            </ul>
+                        </div>
 
-                    {/* Projects */}
-                    <div>
-                        <h3 className="text-white font-display font-bold text-lg mb-6">Featured Projects</h3>
-                        <ul className="space-y-3">
-                            <li>
-                                <Link to="/projects/furaha" className="hover:text-primary-400 transition-colors duration-200">
-                                    Furaha Residences
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/projects/zuri" className="hover:text-primary-400 transition-colors duration-200">
-                                    Zuri Heights
-                                </Link>
-                            </li>
-                            <li>
-                                <Link to="/projects/marble-view" className="hover:text-primary-400 transition-colors duration-200">
-                                    Marble View Estates
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
+                        {/* Projects */}
+                        <div>
+                            <h3 className="text-white font-display font-bold text-lg mb-6">
+                                Featured Projects
+                            </h3>
 
-                    {/* Contact Info */}
-                    <div>
-                        <h3 className="text-white font-display font-bold text-lg mb-6">Contact Us</h3>
-                        <ul className="space-y-4">
-                            <li className="flex items-start gap-3">
-                                <MapPin className="w-5 h-5 text-primary-400 flex-shrink-0 mt-1" />
-                                <span>123 Real Estate Avenue, Nairobi, Kenya</span>
-                            </li>
-                            <li className="flex items-center gap-3">
-                                <Phone className="w-5 h-5 text-primary-400 flex-shrink-0" />
-                                <a href="tel:+254700000000" className="hover:text-primary-400 transition-colors duration-200">
-                                    +254 700 000 000
-                                </a>
-                            </li>
-                            <li className="flex items-center gap-3">
-                                <Mail className="w-5 h-5 text-primary-400 flex-shrink-0" />
-                                <a href="mailto:info@supeva.com" className="hover:text-primary-400 transition-colors duration-200">
-                                    info@supeva.com
-                                </a>
-                            </li>
-                            <li className="flex items-center gap-3">
-                                <MessageCircle className="w-5 h-5 text-primary-400 flex-shrink-0" />
-                                <a href="https://wa.me/254700000000" target="_blank" rel="noopener noreferrer" className="hover:text-primary-400 transition-colors duration-200">
-                                    WhatsApp
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    {[1, 2, 3, 4, 5].map((i) => (
+                                        <div key={i} className="h-5 bg-gray-700/30 rounded animate-pulse"></div>
+                                    ))}
+                                </div>
+                            ) : error ? (
+                                <div className="text-red-300/80 text-sm p-2 bg-red-500/10 rounded">
+                                    {error}
+                                    <button
+                                        onClick={() => window.location.reload()}
+                                        className="ml-2 text-red-200 underline"
+                                    >
+                                        Retry
+                                    </button>
+                                </div>
+                            ) : projects.length === 0 ? (
+                                <p className="text-gray-400 text-sm italic">No projects available</p>
+                            ) : (
+                                <ul className="space-y-2.5">
+                                    {projects.map((project) => (
+                                        <li key={project.id}>
+                                            <Link
+                                                to={`/projects/${project.slug}`}
+                                                className="group flex items-center text-gray-300 hover:text-white transition-all duration-200"
+                                            >
+                                                <span className="w-1.5 h-1.5 bg-primary-400 rounded-full mr-3 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                                                <span className="group-hover:translate-x-1 transition-transform">
+                                                    {project.title} {/* Changed from project.name to project.title */}
+                                                </span>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
 
-            {/* Bottom Bar */}
-            <div className="border-t border-gray-800">
-                <div className="container-custom py-6">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                        <p className="text-gray-400 text-sm">
-                            © {currentYear} Supeva Sandbox. All rights reserved.
-                        </p>
-                        <div className="flex gap-6 text-sm">
-                            <Link to="/privacy" className="hover:text-primary-400 transition-colors duration-200">
-                                Privacy Policy
-                            </Link>
-                            <Link to="/terms" className="hover:text-primary-400 transition-colors duration-200">
-                                Terms of Service
-                            </Link>
+                        {/* Contact Info */}
+                        <div>
+                            <h3 className="text-white font-display font-bold text-lg mb-6">Contact Us</h3>
+                            <ul className="space-y-4">
+                                <li className="flex items-start gap-3">
+                                    <MapPin className="w-5 h-5 text-primary-400 flex-shrink-0 mt-1" />
+                                    <span>Barbar Center, Lamu Road, Malindi, Kenya</span>
+                                </li>
+                                <li className="flex items-center gap-3">
+                                    <Phone className="w-5 h-5 text-primary-400 flex-shrink-0" />
+                                    <a href="tel:+254725159164" className="hover:text-primary-400 transition-colors duration-200">
+                                        +254 725 159 164
+                                    </a>
+                                </li>
+                                <li className="flex items-center gap-3">
+                                    <Mail className="w-5 h-5 text-primary-400 flex-shrink-0" />
+                                    <a href="mailto:muchiri@supeva.ke" className="hover:text-primary-400 transition-colors duration-200">
+                                        muchiri@supeva.ke
+                                    </a>
+                                </li>
+                                <li className="flex items-center gap-3">
+                                    <MessageCircle className="w-5 h-5 text-primary-400 flex-shrink-0" />
+                                    <a href="https://wa.me/254725159164" target="_blank" rel="noopener noreferrer" className="hover:text-primary-400 transition-colors duration-200">
+                                        WhatsApp
+                                    </a>
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>
-            </div>
+
+                {/* Bottom Bar */}
+                <div className="border-t border-gray-800">
+                    <div className="container-custom py-6">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                            <p className="text-gray-400 text-sm">
+                                © {currentYear} Supeva Sandbox. All rights reserved.
+                            </p>
+                            <div className="flex gap-6 text-sm">
+                                <Link to="/privacy" className="hover:text-primary-400 transition-colors duration-200">
+                                    Privacy Policy
+                                </Link>
+                                <Link to="/terms" className="hover:text-primary-400 transition-colors duration-200">
+                                    Terms of Service
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </footer>
         </>
     );

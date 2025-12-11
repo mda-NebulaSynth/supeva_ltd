@@ -27,8 +27,8 @@ export const AboutPage = () => {
     ];
 
     const stats = [
-        { number: '500+', label: 'Happy Clients' },
-        { number: '50+', label: 'Projects Completed' },
+        { number: '100+', label: 'Happy Clients' },
+        { number: '30+', label: 'Projects Completed' },
         { number: '15+', label: 'Years Experience' },
         { number: '98%', label: 'Client Satisfaction' }
     ];
@@ -92,7 +92,7 @@ export const AboutPage = () => {
                                     </div>
                                     <h2 className="text-3xl font-display font-bold mb-4">Our Mission</h2>
                                     <p className="text-gray-600 leading-relaxed">
-                                        To provide quality, affordable housing solutions that empower individuals and families to own their dream homes. We are committed to excellence in construction, customer service, and community development.
+                                        To design and build high-quality, sustainable,and innovative real estate projects that enhance communities, drive investment growth and set new industry benchmarks.
                                     </p>
                                 </div>
                             </StaggeredItem>
