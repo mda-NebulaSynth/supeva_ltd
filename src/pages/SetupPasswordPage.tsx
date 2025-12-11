@@ -57,8 +57,10 @@ export const SetupPasswordPage = () => {
                             setFullName(session.user.user_metadata.full_name);
                         }
 
-                        window.history.replaceState(null, '', '/setup-password');
-                        console.log('🗑️ URL cleaned');
+                        // CRITICAL: Clear ALL URL params, not just hash
+                        const cleanUrl = window.location.origin + '/setup-password';
+                        window.history.replaceState(null, '', cleanUrl);
+                        console.log('🗑️ URL cleaned completely');
                     }
                 } else {
                     console.log('⚠️ No valid invitation tokens found');
@@ -82,6 +84,11 @@ export const SetupPasswordPage = () => {
         };
 
         processInvitation();
+
+        // Cleanup: Reset any flags when component unmounts
+        return () => {
+            console.log('🧹 SetupPasswordPage unmounting');
+        };
     }, [navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -177,7 +184,7 @@ export const SetupPasswordPage = () => {
                         .select('*')
                         .eq('id', currentUser.id)
                         .maybeSingle();
-                    
+
                     if (profile) {
                         console.log('✅ Profile confirmed, redirecting immediately...');
                         // Small delay for user to see success message
@@ -262,7 +269,7 @@ export const SetupPasswordPage = () => {
                     </div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-3">Welcome to Supeva Admin</h1>
                     <p className="text-gray-600">Set up your administrator account to get started</p>
-                    
+
                     {userEmail && (
                         <div className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 bg-blue-50 rounded-lg">
                             <Mail className="w-4 h-4 text-blue-600" />
@@ -375,7 +382,7 @@ export const SetupPasswordPage = () => {
                                         🔒 Save Your Password
                                     </p>
                                     <p className="text-xs text-yellow-700">
-                                        Please write down your password and store it in a safe place. 
+                                        Please write down your password and store it in a safe place.
                                         You'll need it to access your administrator account.
                                     </p>
                                 </div>

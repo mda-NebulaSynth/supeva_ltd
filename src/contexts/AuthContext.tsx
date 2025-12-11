@@ -50,22 +50,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [session, setSession] = useState<Session | null>(null);
     const [profile, setProfile] = useState<AdminProfile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [stabilizedLoading, setStabilizedLoading] = useState(true); // New: stabilized loading state
+    const [stabilizedLoading, setStabilizedLoading] = useState(true);
     const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+    const [isSettingUp, setIsSettingUp] = useState(false); // NEW: Track if we're in setup mode
+
+    // Stabilize loading state to prevent flicker
     useEffect(() => {
-        let timeoutId: number; // Change from NodeJS.Timeout to number
+        let timeoutId: number;
 
         if (loading) {
             setStabilizedLoading(true);
         } else {
             // Keep loading visible for at least 300ms to prevent flicker
-            timeoutId = window.setTimeout(() => { // Use window.setTimeout
+            timeoutId = window.setTimeout(() => {
                 setStabilizedLoading(false);
             }, 300);
         }
 
         return () => {
-            if (timeoutId) clearTimeout(timeoutId);
+            if (timeoutId) window.clearTimeout(timeoutId);
         };
     }, [loading]);
 
@@ -115,7 +118,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     const refreshProfile = async () => {
-        if (user) {
+        if (user && !isSettingUp) { // Don't refresh if we're setting up
             await fetchProfile(user.id);
         }
     };
@@ -124,6 +127,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const initializeAuth = async () => {
         try {
             console.log('🔄 Initializing auth...');
+
+            // Check if we're on setup-password page
+            const isSetupPage = window.location.pathname.includes('/setup-password');
+            if (isSetupPage) {
+                console.log('🎯 On setup page, delaying profile fetch');
+                setIsSettingUp(true);
+            }
+
             const { data: { session }, error } = await supabase.auth.getSession();
 
             if (error) {
@@ -133,7 +144,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 setSession(session);
                 setUser(session?.user ?? null);
 
-                if (session?.user) {
+                if (session?.user && !isSetupPage) {
                     // Check if this is a new invited user
                     const hash = window.location.hash;
                     const params = new URLSearchParams(window.location.search);
@@ -167,11 +178,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             async (_event, session) => {
                 console.log('👂 Auth state changed:', _event, session?.user?.id);
 
-                // Skip if we're on the setup-password page
-                if (window.location.pathname.includes('/setup-password')) {
-                    console.log('⏭️ Skipping auth update on setup-password page');
+                // CRITICAL FIX: Check current page BEFORE any logic
+                const isSetupPage = window.location.pathname.includes('/setup-password');
+                const hasInviteToken = window.location.hash.includes('access_token') ||
+                    new URLSearchParams(window.location.search).has('access_token');
+
+                // If we're on setup page OR have invite tokens, skip updates
+                if (isSetupPage || hasInviteToken) {
+                    console.log('⏭️ Skipping auth update - on setup page or has invite');
+                    setIsSettingUp(true);
                     return;
                 }
+
+                // Reset setup flag if we're not on setup page anymore
+                setIsSettingUp(false);
 
                 // Update session and user state
                 setSession(session);
@@ -251,7 +271,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         user,
         session,
         profile,
-        loading: stabilizedLoading, // Use stabilized loading instead
+        loading: stabilizedLoading,
         isDeveloper,
         isFounder,
         isStaff,
