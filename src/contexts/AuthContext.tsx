@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 export type AdminRole = 'developer' | 'founder' | 'staff';
 
 export interface AdminProfile {
-    id: string; // This matches the user's id from auth.users
+    id: string;
     email: string;
     full_name: string;
     role: AdminRole;
@@ -50,23 +50,39 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [session, setSession] = useState<Session | null>(null);
     const [profile, setProfile] = useState<AdminProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [stabilizedLoading, setStabilizedLoading] = useState(true); // New: stabilized loading state
     const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+    useEffect(() => {
+        let timeoutId: number; // Change from NodeJS.Timeout to number
+
+        if (loading) {
+            setStabilizedLoading(true);
+        } else {
+            // Keep loading visible for at least 300ms to prevent flicker
+            timeoutId = window.setTimeout(() => { // Use window.setTimeout
+                setStabilizedLoading(false);
+            }, 300);
+        }
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [loading]);
 
     // Derived states for role checks
     const isDeveloper = profile?.role === 'developer';
     const isFounder = profile?.role === 'founder';
     const isStaff = profile?.role === 'staff';
-    const isActiveAdmin = Boolean(profile); // If profile exists, user is active
+    const isActiveAdmin = Boolean(profile);
 
     const fetchProfile = async (userId: string) => {
         try {
             console.log('🔍 Fetching profile for user:', userId);
 
-            // IMPORTANT: Use 'profiles' table and match by 'id' column
             const { data, error } = await supabase
-                .from('profiles') // ✅ Changed from 'admin_profiles' to 'profiles'
+                .from('profiles')
                 .select('*')
-                .eq('id', userId) // ✅ Changed from 'user_id' to 'id'
+                .eq('id', userId)
                 .maybeSingle();
 
             console.log('📦 Supabase response - data:', data, 'error:', error);
@@ -121,7 +137,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                     // Check if this is a new invited user
                     const hash = window.location.hash;
                     const params = new URLSearchParams(window.location.search);
-                    const isNewInvitedUser = 
+                    const isNewInvitedUser =
                         (hash.includes('access_token') && hash.includes('type=invite')) ||
                         (params.has('access_token') && params.get('type') === 'invite');
 
@@ -235,7 +251,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         user,
         session,
         profile,
-        loading,
+        loading: stabilizedLoading, // Use stabilized loading instead
         isDeveloper,
         isFounder,
         isStaff,

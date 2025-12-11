@@ -163,11 +163,40 @@ export const SetupPasswordPage = () => {
                     .eq('id', user.id);
             }
 
-            // Success
+            // Set success state
             setSuccess(true);
-            setTimeout(() => {
-                navigate('/admin');
-            }, 3000);
+
+            // SMART REDIRECT: Check if profile is loaded before redirecting
+            const checkAndRedirect = async () => {
+                // First, verify the profile was created
+                const { data: { user: currentUser } } = await supabase.auth.getUser();
+                if (currentUser) {
+                    // Try to get profile directly
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', currentUser.id)
+                        .maybeSingle();
+                    
+                    if (profile) {
+                        console.log('✅ Profile confirmed, redirecting immediately...');
+                        // Small delay for user to see success message
+                        setTimeout(() => {
+                            navigate('/admin', { replace: true });
+                        }, 1500);
+                    } else {
+                        console.log('⚠️ Profile not found yet, waiting...');
+                        // Wait longer and redirect anyway (ProtectedRoute will handle it)
+                        setTimeout(() => {
+                            console.log('🔄 Redirecting to admin (profile check timed out)');
+                            navigate('/admin', { replace: true });
+                        }, 3000);
+                    }
+                }
+            };
+
+            // Start the redirect check
+            checkAndRedirect();
 
         } catch (err: any) {
             console.error('Setup error:', err);
