@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Lock, CheckCircle, AlertCircle, User, Mail } from 'lucide-react';
+import { Lock, CheckCircle, AlertCircle, User, Mail, Key, Shield, Save, Eye, EyeOff } from 'lucide-react';
 
 export const SetupPasswordPage = () => {
     const navigate = useNavigate();
@@ -13,6 +13,8 @@ export const SetupPasswordPage = () => {
     const [loading, setLoading] = useState(false);
     const [userEmail, setUserEmail] = useState('');
     const [isProcessingHash, setIsProcessingHash] = useState(true);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     useEffect(() => {
         const processInvitation = async () => {
@@ -35,7 +37,6 @@ export const SetupPasswordPage = () => {
                 if (accessToken && type === 'invite') {
                     console.log('🔑 Setting session from invitation tokens');
 
-                    // IMPORTANT: Set session WITHOUT waiting for AuthContext
                     const { data: { session }, error: sessionError } = await supabase.auth.setSession({
                         access_token: accessToken,
                         refresh_token: refreshToken || ''
@@ -52,12 +53,10 @@ export const SetupPasswordPage = () => {
                         console.log('✅ Session set for:', session.user.email);
                         setUserEmail(session.user.email || '');
 
-                        // Pre-fill name if available
                         if (session.user.user_metadata?.full_name) {
                             setFullName(session.user.user_metadata.full_name);
                         }
 
-                        // CRITICAL: Clean the URL IMMEDIATELY
                         window.history.replaceState(null, '', '/setup-password');
                         console.log('🗑️ URL cleaned');
                     }
@@ -78,7 +77,6 @@ export const SetupPasswordPage = () => {
             if (user) {
                 setUserEmail(user.email || '');
             } else {
-                // No user found, redirect to login
                 navigate('/login');
             }
         };
@@ -90,7 +88,7 @@ export const SetupPasswordPage = () => {
         e.preventDefault();
         setError('');
 
-        // Validation (keep existing)
+        // Validation
         if (!fullName.trim()) {
             setError('Please enter your full name');
             return;
@@ -101,72 +99,51 @@ export const SetupPasswordPage = () => {
             return;
         }
 
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters');
+        if (password.length < 8) {
+            setError('Password must be at least 8 characters');
             return;
         }
 
         setLoading(true);
 
         try {
-            console.log('🔄 Starting password setup...');
-
-            // 1. Update user password
+            // Update user password
             const { error: passwordError } = await supabase.auth.updateUser({
                 password: password,
                 data: { full_name: fullName.trim() }
             });
 
-            if (passwordError) {
-                console.error('Password update error:', passwordError);
-                throw passwordError;
-            }
+            if (passwordError) throw passwordError;
 
-            console.log('✅ Password updated');
-
-            // 2. Get current user
+            // Get current user
             const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not found after password update');
 
-            if (!user) {
-                throw new Error('User not found after password update');
-            }
-
-            console.log('👤 User:', user.email);
-
-            // 3. Check if profile already exists
-            const { data: existingProfile, error: profileCheckError } = await supabase
-                .from('profiles') // ✅ Use 'profiles'
+            // Check if profile exists
+            const { data: existingProfile } = await supabase
+                .from('profiles')
                 .select('*')
-                .eq('id', user.id) // ✅ Use 'id' column
+                .eq('id', user.id)
                 .maybeSingle();
 
-            if (profileCheckError && profileCheckError.code !== 'PGRST116') {
-                console.error('Profile check error:', profileCheckError);
-            }
-
-            console.log('📊 Existing profile:', existingProfile ? 'Yes' : 'No');
-
             if (!existingProfile) {
-                // 4. Create profile for this user
-                console.log('➕ Creating new profile...');
+                // Create profile
                 const { error: profileError } = await supabase
-                    .from('profiles') // ✅ Use 'profiles'
+                    .from('profiles')
                     .upsert({
-                        id: user.id,           // ✅ Use 'id' which references auth.users.id
+                        id: user.id,
                         email: user.email,
                         full_name: fullName.trim(),
                         role: 'staff',
                         updated_at: new Date().toISOString()
                     }, {
-                        onConflict: 'id',      // ✅ Conflict on 'id'
+                        onConflict: 'id',
                         ignoreDuplicates: false
                     });
 
                 if (profileError) {
-                    console.error('Profile creation error:', profileError);
-
-                    // Try with insert instead of upsert
-                    const { error: insertError } = await supabase
+                    // Try insert as fallback
+                    await supabase
                         .from('profiles')
                         .insert({
                             id: user.id,
@@ -174,63 +151,23 @@ export const SetupPasswordPage = () => {
                             full_name: fullName.trim(),
                             role: 'staff'
                         });
-
-                    if (insertError) {
-                        console.error('Insert also failed:', insertError);
-                        console.log('⚠️ Profile creation failed, but password was set');
-                    } else {
-                        console.log('✅ Profile created with insert');
-                    }
-                } else {
-                    console.log('✅ Profile created');
                 }
             } else {
-                // Profile exists, update it
-                console.log('✏️ Updating existing profile...');
-                const { error: updateError } = await supabase
+                // Update existing profile
+                await supabase
                     .from('profiles')
                     .update({
                         full_name: fullName.trim(),
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', user.id);
-
-                if (updateError) {
-                    console.error('Profile update error:', updateError);
-                } else {
-                    console.log('✅ Profile updated');
-                }
             }
 
-            // 5. Verify profile
-            console.log('⏳ Verifying profile creation...');
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            const { data: verifiedProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .maybeSingle();
-
-            if (verifiedProfile) {
-                console.log('✅ Profile verified successfully:', verifiedProfile);
-            } else {
-                console.log('⚠️ Profile not found after creation attempt');
-                // Additional debug: try to fetch all profiles (temporarily)
-                const { data: allProfiles } = await supabase
-                    .from('profiles')
-                    .select('*');
-                console.log('📋 All profiles in table:', allProfiles);
-            }
-
-            // 6. Success!
-            console.log('🎉 Setup complete!');
+            // Success
             setSuccess(true);
-
-            // 7. Redirect to admin
             setTimeout(() => {
                 navigate('/admin');
-            }, 2000);
+            }, 3000);
 
         } catch (err: any) {
             console.error('Setup error:', err);
@@ -242,14 +179,14 @@ export const SetupPasswordPage = () => {
 
     if (isProcessingHash) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-accent-50">
-                <div className="max-w-md w-full card-glass p-8 text-center">
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary-600 to-accent-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Lock className="w-8 h-8 text-white animate-pulse" />
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-white">
+                <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+                    <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Lock className="w-10 h-10 text-blue-600 animate-pulse" />
                     </div>
-                    <h2 className="text-2xl font-bold mb-4">Processing Invitation...</h2>
-                    <p className="text-gray-600 mb-6">Setting up your account access</p>
-                    <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Setting Up Your Account</h2>
+                    <p className="text-gray-600 mb-8">Please wait while we prepare your account access...</p>
+                    <div className="w-12 h-12 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
                 </div>
             </div>
         );
@@ -257,140 +194,205 @@ export const SetupPasswordPage = () => {
 
     if (success) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-primary-50">
-                <div className="max-w-md w-full card-glass p-8 text-center">
-                    <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white">
+                <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+                    <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
                         <CheckCircle className="w-10 h-10 text-green-600" />
                     </div>
-                    <h2 className="text-2xl font-bold mb-4">Setup Complete!</h2>
-                    <p className="text-gray-600 mb-2">Your account has been successfully configured.</p>
-                    <p className="text-gray-500 text-sm mb-6">Redirecting to admin dashboard...</p>
-                    <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Account Setup Complete!</h2>
+                    <p className="text-gray-600 mb-6">
+                        Your administrator account has been successfully created.
+                        You will be redirected to the dashboard in a few seconds.
+                    </p>
+                    <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-start gap-3">
+                            <Save className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div className="text-left">
+                                <p className="text-sm font-medium text-blue-900 mb-1">
+                                    📝 Important Security Note
+                                </p>
+                                <p className="text-xs text-blue-700">
+                                    Please save your password in a secure location. You'll need it to log in to your account.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-6 w-12 h-12 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-accent-50 p-4">
-            <div className="max-w-md w-full card-glass p-8">
-                <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary-600 to-accent-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Lock className="w-8 h-8 text-white" />
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-white p-4">
+            <div className="max-w-md w-full">
+                {/* Header */}
+                <div className="text-center mb-10">
+                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                        <Shield className="w-8 h-8 text-blue-600" />
                     </div>
-                    <h2 className="text-3xl font-bold mb-2">Complete Your Setup</h2>
-                    <p className="text-gray-600">Finish setting up your administrator account</p>
-
+                    <h1 className="text-3xl font-bold text-gray-900 mb-3">Welcome to Supeva Admin</h1>
+                    <p className="text-gray-600">Set up your administrator account to get started</p>
+                    
                     {userEmail && (
-                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg inline-flex items-center gap-2">
+                        <div className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 bg-blue-50 rounded-lg">
                             <Mail className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm text-blue-800">{userEmail}</span>
+                            <span className="text-sm font-medium text-blue-800">{userEmail}</span>
                         </div>
                     )}
                 </div>
 
-                {error && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-red-800">{error}</p>
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Full Name
-                        </label>
-                        <div className="relative">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                            <input
-                                type="text"
-                                required
-                                value={fullName}
-                                onChange={(e) => setFullName(e.target.value)}
-                                className="input pl-11"
-                                placeholder="Enter your full name"
-                                autoComplete="name"
-                                disabled={loading}
-                            />
+                {/* Main Card */}
+                <div className="bg-white rounded-2xl shadow-lg p-8">
+                    {error && (
+                        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-red-900">Setup Error</p>
+                                    <p className="text-sm text-red-700 mt-1">{error}</p>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            New Password
-                        </label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                            <input
-                                type="password"
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="input pl-11"
-                                placeholder="Minimum 6 characters"
-                                minLength={6}
-                                autoComplete="new-password"
-                                disabled={loading}
-                            />
+                    <form onSubmit={handleSubmit} className="space-y-7">
+                        {/* Full Name Field */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2.5">
+                                Full Name
+                            </label>
+                            <div className="relative">
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    required
+                                    value={fullName}
+                                    onChange={(e) => setFullName(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-lg bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                                    placeholder="Enter your full name"
+                                    autoComplete="name"
+                                    disabled={loading}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Confirm Password
-                        </label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                            <input
-                                type="password"
-                                required
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="input pl-11"
-                                placeholder="Re-enter your password"
-                                autoComplete="new-password"
-                                disabled={loading}
-                            />
+                        {/* Password Field */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2.5">
+                                Create Password
+                            </label>
+                            <div className="relative">
+                                <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full pl-12 pr-12 py-3.5 border border-gray-300 rounded-lg bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                                    placeholder="Create a strong password"
+                                    minLength={8}
+                                    autoComplete="new-password"
+                                    disabled={loading}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    disabled={loading}
+                                >
+                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500">
+                                Must be at least 8 characters
+                            </p>
                         </div>
+
+                        {/* Confirm Password Field */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2.5">
+                                Confirm Password
+                            </label>
+                            <div className="relative">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    required
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full pl-12 pr-12 py-3.5 border border-gray-300 rounded-lg bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                                    placeholder="Re-enter your password"
+                                    autoComplete="new-password"
+                                    disabled={loading}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    disabled={loading}
+                                >
+                                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Security Warning */}
+                        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-yellow-900 mb-1">
+                                        🔒 Save Your Password
+                                    </p>
+                                    <p className="text-xs text-yellow-700">
+                                        Please write down your password and store it in a safe place. 
+                                        You'll need it to access your administrator account.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={loading || !userEmail}
+                            className="w-full py-3.5 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    Setting Up Account...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle className="w-5 h-5" />
+                                    Complete Setup & Continue
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    {/* Cancel Button */}
+                    <div className="mt-8 pt-8 border-t border-gray-200 text-center">
+                        <button
+                            onClick={async () => {
+                                await supabase.auth.signOut();
+                                navigate('/login');
+                            }}
+                            className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-4 py-2 rounded-lg hover:bg-gray-100"
+                            disabled={loading}
+                        >
+                            Cancel and Sign Out
+                        </button>
                     </div>
+                </div>
 
-                    <div className="text-sm text-gray-600 space-y-2">
-                        <p className="font-medium">Requirements:</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                            <li>At least 6 characters</li>
-                            <li>Make it memorable but secure</li>
-                            <li>Your name will be displayed in the admin panel</li>
-                        </ul>
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={loading || !userEmail}
-                        className="w-full btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loading ? (
-                            <>
-                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Completing Setup...
-                            </>
-                        ) : (
-                            'Complete Setup & Continue'
-                        )}
-                    </button>
-                </form>
-
-                <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-                    <button
-                        onClick={async () => {
-                            await supabase.auth.signOut();
-                            navigate('/login');
-                        }}
-                        className="text-sm text-gray-600 hover:text-primary-600"
-                        disabled={loading}
-                    >
-                        Cancel and Sign Out
-                    </button>
+                {/* Footer Note */}
+                <div className="mt-6 text-center">
+                    <p className="text-xs text-gray-500">
+                        Need help? Contact your system administrator
+                    </p>
                 </div>
             </div>
         </div>
