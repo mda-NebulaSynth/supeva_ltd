@@ -104,120 +104,112 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, [user]); // fetchProfile is stable, intentionally not in deps
 
     useEffect(() => {
-        let mounted = true;
-        let initializing = true;
-
         console.log('🎬 AuthProvider useEffect starting');
 
-        // Get initial session
-        // Empty array - run only once on mount
-        useEffect(() => {
-            console.log('🎬 AuthProvider useEffect starting');
+        // 🚀 FIX #3 — simplified session initialization
+        supabase.auth.getSession().then(async ({ data }) => {
+            console.log('📋 Initial session:', data.session?.user?.id);
 
-            // 🚀 FIX #3 — simplified session initialization
-            supabase.auth.getSession().then(async ({ data }) => {
-                console.log('📋 Initial session:', data.session?.user?.id);
+            setSession(data.session);
+            setUser(data.session?.user ?? null);
 
-                setSession(data.session);
-                setUser(data.session?.user ?? null);
+            if (data.session?.user) {
+                await fetchProfile(data.session.user.id);
+            }
 
-                if (data.session?.user) {
-                    await fetchProfile(data.session.user.id);
+            setLoading(false);
+        });
+
+        // Listen for auth changes (remove the initializing guard!)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                console.log('👂 Auth state changed:', event, session?.user?.id);
+
+                setSession(session);
+                setUser(session?.user ?? null);
+
+                if (session?.user) {
+                    await fetchProfile(session.user.id);
+                } else {
+                    setProfile(null);
                 }
 
                 setLoading(false);
+            }
+        );
+
+        return () => {
+            console.log('🧹 Cleaning up auth subscription');
+            subscription.unsubscribe();
+        };
+    }, []);
+
+
+    const signIn = async (email: string, password: string) => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
             });
-
-            // Listen for auth changes (remove the initializing guard!)
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(
-                async (event, session) => {
-                    console.log('👂 Auth state changed:', event, session?.user?.id);
-
-                    setSession(session);
-                    setUser(session?.user ?? null);
-
-                    if (session?.user) {
-                        await fetchProfile(session.user.id);
-                    } else {
-                        setProfile(null);
-                    }
-
-                    setLoading(false);
-                }
-            );
-
-            return () => {
-                console.log('🧹 Cleaning up auth subscription');
-                subscription.unsubscribe();
-            };
-        }, []);
-
-
-        const signIn = async (email: string, password: string) => {
-            setLoading(true);
-            try {
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                return { error };
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const signUp = async (email: string, password: string) => {
-            setLoading(true);
-            try {
-                const { error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                });
-                return { error };
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const signOut = async () => {
-            setLoading(true);
-            try {
-                await supabase.auth.signOut();
-                setUser(null);
-                setSession(null);
-                setProfile(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const resetPassword = async (email: string) => {
-            setLoading(true);
-            try {
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${window.location.origin}/reset-password`,
-                });
-                return { error };
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const value = {
-            user,
-            session,
-            profile,
-            loading,
-            isDeveloper,
-            isFounder,
-            isStaff,
-            isActiveAdmin,
-            signIn,
-            signUp,
-            signOut,
-            resetPassword,
-            refreshProfile,
-        };
-
-        return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+            return { error };
+        } finally {
+            setLoading(false);
+        }
     };
+
+    const signUp = async (email: string, password: string) => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+            return { error };
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const signOut = async () => {
+        setLoading(true);
+        try {
+            await supabase.auth.signOut();
+            setUser(null);
+            setSession(null);
+            setProfile(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const resetPassword = async (email: string) => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/reset-password`,
+            });
+            return { error };
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const value = {
+        user,
+        session,
+        profile,
+        loading,
+        isDeveloper,
+        isFounder,
+        isStaff,
+        isActiveAdmin,
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+        refreshProfile,
+    };
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
