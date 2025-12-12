@@ -51,6 +51,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [profile, setProfile] = useState<AdminProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const fetchingRef = useRef(false);
+    const skipNextFetchRef = useRef(false);
 
     // Derived states for role checks
     const isDeveloper = profile?.role === 'developer';
@@ -61,6 +62,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Define fetchProfile directly inside the component (not useCallback)
     // This prevents dependency array issues in useEffect
     const fetchProfile = async (userId: string, mountedRef?: boolean) => {
+        // Check if we should skip this fetch
+        if (skipNextFetchRef.current) {
+            console.log('⏭️ Skipping profile fetch as requested');
+            skipNextFetchRef.current = false;
+            return null;
+        }
+
         // Prevent concurrent fetches
         if (fetchingRef.current) {
             console.log('⏸️ Profile fetch already in progress, skipping...');
@@ -72,11 +80,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
             console.log('🔍 Fetching profile for user:', userId, 'mounted:', mountedRef);
 
-            const { data, error } = await supabase
+            // Add timeout to prevent hanging indefinitely
+            const fetchPromise = supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
                 .maybeSingle();
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+            );
+
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
             console.log('📡 Fetch complete - data:', !!data, 'error:', error?.message, 'mounted check:', mountedRef);
 

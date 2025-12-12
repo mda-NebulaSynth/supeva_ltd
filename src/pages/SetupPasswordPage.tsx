@@ -178,42 +178,56 @@ export const SetupPasswordPage = () => {
             console.log('🎉 Setup complete, showing success screen');
             setSuccess(true);
 
-            // Wait longer for password update and auth event to fully process
-            // The USER_UPDATED event triggers profile fetch, give it time to complete
-            console.log('⏱️ Waiting for auth event and profile fetch to complete...');
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Wait a moment for password update to be sent
+            console.log('⏱️ Waiting for password update to process...');
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // CRITICAL: Manually refresh profile in AuthContext before redirect
-            // This ensures the profile is loaded before ProtectedRoute checks it
-            console.log('🔄 Manually refreshing profile in AuthContext...');
-            try {
-                await refreshProfile();
-                console.log('✅ Profile refresh completed');
-            } catch (refreshError) {
-                console.error('❌ Error refreshing profile:', refreshError);
-            }
+            // Poll for profile existence with timeout
+            console.log('🔄 Polling for profile...');
+            let profileFound = false;
+            let attempts = 0;
+            const maxAttempts = 10;
 
-            // Verify profile is now loaded
-            console.log('🔍 Verifying profile is loaded from database...');
-            try {
-                const { data: verifyProfile, error: verifyError } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .maybeSingle();
+            while (!profileFound && attempts < maxAttempts) {
+                attempts++;
+                console.log(`📍 Profile poll attempt ${attempts}/${maxAttempts}`);
 
-                if (verifyError) {
-                    console.error('❌ Error verifying profile:', verifyError);
-                } else if (verifyProfile) {
-                    console.log('✅ Profile verified and loaded:', verifyProfile.id);
-                } else {
-                    console.log('⚠️ Profile not found in verification');
+                try {
+                    const { data: checkProfile, error: checkError } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', user.id)
+                        .maybeSingle();
+
+                    if (checkError) {
+                        console.error('❌ Error checking profile:', checkError);
+                    } else if (checkProfile) {
+                        console.log('✅ Profile found!', checkProfile.id);
+                        profileFound = true;
+
+                        // Manually refresh profile in AuthContext to update state
+                        console.log('🔄 Refreshing AuthContext with found profile...');
+                        try {
+                            await refreshProfile();
+                            console.log('✅ AuthContext refreshed');
+                        } catch (refreshError) {
+                            console.error('❌ Error refreshing AuthContext:', refreshError);
+                        }
+                    } else {
+                        console.log('⏳ Profile not found yet, waiting...');
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                } catch (pollError) {
+                    console.error('💥 Error during profile poll:', pollError);
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
-            } catch (verifyErr) {
-                console.error('💥 Exception verifying profile:', verifyErr);
             }
 
-            // Small delay to ensure state propagates through React
+            if (!profileFound) {
+                console.log('⚠️ Profile not found after polling, redirecting anyway');
+            }
+
+            // Small delay to ensure state propagates
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // Redirect to admin
