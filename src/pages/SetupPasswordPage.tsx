@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { Lock, CheckCircle, AlertCircle, User, Mail, Key, Shield, Save, Eye, EyeOff } from 'lucide-react';
 
 export const SetupPasswordPage = () => {
     const navigate = useNavigate();
+    const { refreshProfile } = useAuth();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [fullName, setFullName] = useState('');
@@ -176,12 +178,35 @@ export const SetupPasswordPage = () => {
             console.log('🎉 Setup complete, showing success screen');
             setSuccess(true);
 
-            // Simple redirect after showing success message
-            console.log('⏱️ Scheduling redirect to admin...');
-            setTimeout(() => {
-                console.log('🚀 Redirecting to /admin');
-                navigate('/admin', { replace: true });
-            }, 2000);
+            // Wait for password update to trigger auth event
+            console.log('⏱️ Waiting for auth event to process...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // CRITICAL: Manually refresh profile in AuthContext before redirect
+            // This ensures the profile is loaded before ProtectedRoute checks it
+            console.log('🔄 Manually refreshing profile in AuthContext...');
+            await refreshProfile();
+
+            // Verify profile is now loaded
+            console.log('🔍 Verifying profile is loaded...');
+            const { data: verifyProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (verifyProfile) {
+                console.log('✅ Profile verified and loaded:', verifyProfile.id);
+            } else {
+                console.log('⚠️ Profile verification failed - still redirecting');
+            }
+
+            // Small delay to ensure state propagates
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Redirect to admin
+            console.log('🚀 Redirecting to /admin');
+            navigate('/admin', { replace: true });
 
         } catch (err: any) {
             console.error('Setup error:', err);
