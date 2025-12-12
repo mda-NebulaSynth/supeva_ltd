@@ -110,151 +110,114 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         console.log('🎬 AuthProvider useEffect starting');
 
         // Get initial session
-        const initializeAuth = async () => {
-            try {
-                console.log('🔄 Initializing auth... (mounted:', mounted, ')');
+        // Empty array - run only once on mount
+        useEffect(() => {
+            console.log('🎬 AuthProvider useEffect starting');
 
-                const { data: { session }, error } = await supabase.auth.getSession();
+            // 🚀 FIX #3 — simplified session initialization
+            supabase.auth.getSession().then(async ({ data }) => {
+                console.log('📋 Initial session:', data.session?.user?.id);
 
-                console.log('📦 getSession response:', { hasSession: !!session, error: error?.message, stillMounted: mounted });
+                setSession(data.session);
+                setUser(data.session?.user ?? null);
 
-                if (error) {
-                    console.error('❌ Error getting session:', error);
-                    if (mounted) setLoading(false);
-                    initializing = false;
-                    return;
+                if (data.session?.user) {
+                    await fetchProfile(data.session.user.id);
                 }
 
-                console.log('📋 Session retrieved:', session?.user?.id);
+                setLoading(false);
+            });
 
-                if (!mounted) {
-                    console.log('⚠️ Component unmounted before session processing');
-                    initializing = false;
-                    return;
-                }
+            // Listen for auth changes (remove the initializing guard!)
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(
+                async (event, session) => {
+                    console.log('👂 Auth state changed:', event, session?.user?.id);
 
-                setSession(session);
-                setUser(session?.user ?? null);
+                    setSession(session);
+                    setUser(session?.user ?? null);
 
-                if (session?.user) {
-                    console.log('🎯 About to fetch profile, mounted:', mounted);
-                    const result = await fetchProfile(session.user.id, mounted);
-                    console.log('📥 fetchProfile returned:', !!result, 'stillMounted:', mounted);
-                }
-            } catch (error) {
-                console.error('💥 Exception during auth initialization:', error);
-            } finally {
-                console.log('🏁 Initial auth load complete (mounted:', mounted, ')');
-                if (mounted) {
+                    if (session?.user) {
+                        await fetchProfile(session.user.id);
+                    } else {
+                        setProfile(null);
+                    }
+
                     setLoading(false);
-                    initializing = false;
                 }
+            );
+
+            return () => {
+                console.log('🧹 Cleaning up auth subscription');
+                subscription.unsubscribe();
+            };
+        }, []);
+
+
+        const signIn = async (email: string, password: string) => {
+            setLoading(true);
+            try {
+                const { error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+                return { error };
+            } finally {
+                setLoading(false);
             }
         };
 
-        initializeAuth();
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, session) => {
-                // CRITICAL: Skip auth state changes during initial load
-                // This prevents duplicate profile fetches
-                if (initializing) {
-                    console.log('⏭️ Skipping auth state change during initialization:', _event);
-                    return;
-                }
-
-                if (!mounted) {
-                    console.log('⚠️ Auth state change but component unmounted');
-                    return;
-                }
-
-                console.log('👂 Auth state changed:', _event, session?.user?.id, 'mounted:', mounted);
-
-                setSession(session);
-                setUser(session?.user ?? null);
-
-                if (session?.user) {
-                    console.log('🎯 Fetching profile from auth state change, mounted:', mounted);
-                    await fetchProfile(session.user.id, mounted);
-                } else {
-                    setProfile(null);
-                }
+        const signUp = async (email: string, password: string) => {
+            setLoading(true);
+            try {
+                const { error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                });
+                return { error };
+            } finally {
+                setLoading(false);
             }
-        );
-
-        return () => {
-            mounted = false;
-            console.log('🧹 Cleaning up auth subscription');
-            subscription.unsubscribe();
         };
-    }, []); // Empty array - run only once on mount
 
-    const signIn = async (email: string, password: string) => {
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-            return { error };
-        } finally {
-            setLoading(false);
-        }
+        const signOut = async () => {
+            setLoading(true);
+            try {
+                await supabase.auth.signOut();
+                setUser(null);
+                setSession(null);
+                setProfile(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const resetPassword = async (email: string) => {
+            setLoading(true);
+            try {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: `${window.location.origin}/reset-password`,
+                });
+                return { error };
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const value = {
+            user,
+            session,
+            profile,
+            loading,
+            isDeveloper,
+            isFounder,
+            isStaff,
+            isActiveAdmin,
+            signIn,
+            signUp,
+            signOut,
+            resetPassword,
+            refreshProfile,
+        };
+
+        return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
     };
-
-    const signUp = async (email: string, password: string) => {
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.signUp({
-                email,
-                password,
-            });
-            return { error };
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const signOut = async () => {
-        setLoading(true);
-        try {
-            await supabase.auth.signOut();
-            setUser(null);
-            setSession(null);
-            setProfile(null);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const resetPassword = async (email: string) => {
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/reset-password`,
-            });
-            return { error };
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const value = {
-        user,
-        session,
-        profile,
-        loading,
-        isDeveloper,
-        isFounder,
-        isStaff,
-        isActiveAdmin,
-        signIn,
-        signUp,
-        signOut,
-        resetPassword,
-        refreshProfile,
-    };
-
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
