@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode, useCallback } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -50,6 +50,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [session, setSession] = useState<Session | null>(null);
     const [profile, setProfile] = useState<AdminProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const fetchingRef = useRef(false);
 
     // Derived states for role checks
     const isDeveloper = profile?.role === 'developer';
@@ -60,6 +61,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Define fetchProfile directly inside the component (not useCallback)
     // This prevents dependency array issues in useEffect
     const fetchProfile = async (userId: string, mountedRef?: boolean) => {
+        // Prevent concurrent fetches
+        if (fetchingRef.current) {
+            console.log('⏸️ Profile fetch already in progress, skipping...');
+            return null;
+        }
+
+        fetchingRef.current = true;
+
         try {
             console.log('🔍 Fetching profile for user:', userId, 'mounted:', mountedRef);
 
@@ -93,6 +102,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             console.error('💥 Exception in fetchProfile:', error);
             setProfile(null);
             return null;
+        } finally {
+            fetchingRef.current = false;
         }
     };
 

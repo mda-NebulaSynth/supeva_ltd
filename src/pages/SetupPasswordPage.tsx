@@ -178,30 +178,42 @@ export const SetupPasswordPage = () => {
             console.log('🎉 Setup complete, showing success screen');
             setSuccess(true);
 
-            // Wait for password update to trigger auth event
-            console.log('⏱️ Waiting for auth event to process...');
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait longer for password update and auth event to fully process
+            // The USER_UPDATED event triggers profile fetch, give it time to complete
+            console.log('⏱️ Waiting for auth event and profile fetch to complete...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
             // CRITICAL: Manually refresh profile in AuthContext before redirect
             // This ensures the profile is loaded before ProtectedRoute checks it
             console.log('🔄 Manually refreshing profile in AuthContext...');
-            await refreshProfile();
-
-            // Verify profile is now loaded
-            console.log('🔍 Verifying profile is loaded...');
-            const { data: verifyProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .maybeSingle();
-
-            if (verifyProfile) {
-                console.log('✅ Profile verified and loaded:', verifyProfile.id);
-            } else {
-                console.log('⚠️ Profile verification failed - still redirecting');
+            try {
+                await refreshProfile();
+                console.log('✅ Profile refresh completed');
+            } catch (refreshError) {
+                console.error('❌ Error refreshing profile:', refreshError);
             }
 
-            // Small delay to ensure state propagates
+            // Verify profile is now loaded
+            console.log('🔍 Verifying profile is loaded from database...');
+            try {
+                const { data: verifyProfile, error: verifyError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                if (verifyError) {
+                    console.error('❌ Error verifying profile:', verifyError);
+                } else if (verifyProfile) {
+                    console.log('✅ Profile verified and loaded:', verifyProfile.id);
+                } else {
+                    console.log('⚠️ Profile not found in verification');
+                }
+            } catch (verifyErr) {
+                console.error('💥 Exception verifying profile:', verifyErr);
+            }
+
+            // Small delay to ensure state propagates through React
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // Redirect to admin
