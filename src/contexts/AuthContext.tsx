@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
-                .maybeSingle(); // Use maybeSingle instead of single - returns null if not found
+                .maybeSingle();
 
             console.log('📡 Fetch complete - data:', !!data, 'error:', error?.message, 'mounted check:', mountedRef);
 
@@ -104,46 +104,91 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, [user]); // fetchProfile is stable, intentionally not in deps
 
     useEffect(() => {
+        let mounted = true;
+        let initializing = true;
+
         console.log('🎬 AuthProvider useEffect starting');
 
-        // 🚀 FIX #3 — simplified session initialization
-        supabase.auth.getSession().then(async ({ data }) => {
-            console.log('📋 Initial session:', data.session?.user?.id);
+        // Get initial session
+        const initializeAuth = async () => {
+            try {
+                console.log('🔄 Initializing auth... (mounted:', mounted, ')');
 
-            setSession(data.session);
-            setUser(data.session?.user ?? null);
+                const { data: { session }, error } = await supabase.auth.getSession();
 
-            if (data.session?.user) {
-                await fetchProfile(data.session.user.id);
-            }
+                console.log('📦 getSession response:', { hasSession: !!session, error: error?.message, stillMounted: mounted });
 
-            setLoading(false);
-        });
+                if (error) {
+                    console.error('❌ Error getting session:', error);
+                    if (mounted) setLoading(false);
+                    initializing = false;
+                    return;
+                }
 
-        // Listen for auth changes (remove the initializing guard!)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                console.log('👂 Auth state changed:', event, session?.user?.id);
+                console.log('📋 Session retrieved:', session?.user?.id);
+
+                if (!mounted) {
+                    console.log('⚠️ Component unmounted before session processing');
+                    initializing = false;
+                    return;
+                }
 
                 setSession(session);
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
-                    await fetchProfile(session.user.id);
+                    console.log('🎯 About to fetch profile, mounted:', mounted);
+                    const result = await fetchProfile(session.user.id, mounted);
+                    console.log('📥 fetchProfile returned:', !!result, 'stillMounted:', mounted);
+                }
+            } catch (error) {
+                console.error('💥 Exception during auth initialization:', error);
+            } finally {
+                console.log('🏁 Initial auth load complete (mounted:', mounted, ')');
+                if (mounted) {
+                    setLoading(false);
+                    initializing = false;
+                }
+            }
+        };
+
+        initializeAuth();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (_event, session) => {
+                // CRITICAL: Skip auth state changes during initial load
+                // This prevents duplicate profile fetches
+                if (initializing) {
+                    console.log('⏭️ Skipping auth state change during initialization:', _event);
+                    return;
+                }
+
+                if (!mounted) {
+                    console.log('⚠️ Auth state change but component unmounted');
+                    return;
+                }
+
+                console.log('👂 Auth state changed:', _event, session?.user?.id, 'mounted:', mounted);
+
+                setSession(session);
+                setUser(session?.user ?? null);
+
+                if (session?.user) {
+                    console.log('🎯 Fetching profile from auth state change, mounted:', mounted);
+                    await fetchProfile(session.user.id, mounted);
                 } else {
                     setProfile(null);
                 }
-
-                setLoading(false);
             }
         );
 
         return () => {
+            mounted = false;
             console.log('🧹 Cleaning up auth subscription');
             subscription.unsubscribe();
         };
-    }, []);
-
+    }, []); // Empty array - run only once on mount
 
     const signIn = async (email: string, password: string) => {
         setLoading(true);
