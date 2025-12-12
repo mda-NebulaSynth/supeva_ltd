@@ -197,12 +197,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
                 console.log('👂 Auth state changed:', _event, session?.user?.id, 'mounted:', mounted);
 
+                // Check if user actually changed - if not, skip profile refetch
+                const userChanged = user?.id !== session?.user?.id;
+
                 setSession(session);
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
-                    console.log('🎯 Fetching profile from auth state change, mounted:', mounted);
-                    await fetchProfile(session.user.id, mounted);
+                    // Only fetch profile if user changed OR if we don't have a profile
+                    if (userChanged || !profile) {
+                        console.log('🎯 Fetching profile from auth state change, mounted:', mounted);
+                        await fetchProfile(session.user.id, mounted);
+                    } else {
+                        console.log('✅ User unchanged and profile exists, skipping fetch');
+                    }
                 } else {
                     setProfile(null);
                 }
