@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
-                .single();
+                .maybeSingle(); // Use maybeSingle instead of single - returns null if not found
 
             console.log('📡 Fetch complete - data:', !!data, 'error:', error?.message, 'mounted check:', mountedRef);
 
