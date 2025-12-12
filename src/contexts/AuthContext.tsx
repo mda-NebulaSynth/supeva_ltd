@@ -52,12 +52,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [loading, setLoading] = useState(true);
     const fetchingRef = useRef(false);
     const skipNextFetchRef = useRef(false);
+    const currentUserIdRef = useRef<string | null>(null);
+    const currentProfileRef = useRef<AdminProfile | null>(null);
 
     // Derived states for role checks
     const isDeveloper = profile?.role === 'developer';
     const isFounder = profile?.role === 'founder';
     const isStaff = profile?.role === 'staff';
     const isActiveAdmin = Boolean(profile);
+
+    // Debug: Log whenever profile state changes
+    useEffect(() => {
+        console.log('📋 Profile state changed:', profile?.id || 'undefined');
+    }, [profile]);
 
     // Define fetchProfile directly inside the component (not useCallback)
     // This prevents dependency array issues in useEffect
@@ -97,13 +104,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
             if (error) {
                 console.error('❌ Error fetching profile:', error);
-                setProfile(null);
+                // Don't clear profile on error - keep existing profile
                 return null;
             }
 
             if (!data) {
                 console.log('⚠️ No profile found for user:', userId);
-                setProfile(null);
+                // Only clear profile if it's for a different user
+                if (currentProfileRef.current?.id !== userId) {
+                    console.log('🗑️ Clearing profile for different user');
+                    setProfile(null);
+                    currentProfileRef.current = null;
+                }
                 return null;
             }
 
@@ -111,11 +123,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             console.log('✅ Profile fetched successfully:', profileData);
             console.log('📝 Setting profile state...');
             setProfile(profileData);
+            currentProfileRef.current = profileData;
             console.log('✔️ Profile state updated');
             return profileData;
         } catch (error) {
             console.error('💥 Exception in fetchProfile:', error);
-            setProfile(null);
+            // Don't clear profile on exception - keep existing profile
             return null;
         } finally {
             fetchingRef.current = false;
@@ -133,7 +146,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         let mounted = true;
         let initializing = true;
 
-        console.log('🎬 AuthProvider useEffect starting');
+        console.log('🎬 AuthProvider useEffect starting - MOUNTING');
 
         // Get initial session
         const initializeAuth = async () => {
@@ -161,6 +174,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
                 setSession(session);
                 setUser(session?.user ?? null);
+                currentUserIdRef.current = session?.user?.id ?? null;
 
                 if (session?.user) {
                     console.log('🎯 About to fetch profile, mounted:', mounted);
@@ -197,29 +211,37 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
                 console.log('👂 Auth state changed:', _event, session?.user?.id, 'mounted:', mounted);
 
-                // Check if user actually changed - if not, skip profile refetch
-                const userChanged = user?.id !== session?.user?.id;
+                // Check if user actually changed using ref (not closure variable)
+                const previousUserId = currentUserIdRef.current;
+                const newUserId = session?.user?.id ?? null;
+                const userChanged = previousUserId !== newUserId;
+
+                console.log('🔍 User change check:', { previousUserId, newUserId, userChanged });
 
                 setSession(session);
                 setUser(session?.user ?? null);
+                currentUserIdRef.current = newUserId;
 
                 if (session?.user) {
-                    // Only fetch profile if user changed OR if we don't have a profile
-                    if (userChanged || !profile) {
-                        console.log('🎯 Fetching profile from auth state change, mounted:', mounted);
+                    // Only fetch profile if user changed
+                    // If profile is missing but user unchanged, let ProtectedRoute's retry logic handle it
+                    if (userChanged) {
+                        console.log('🎯 Fetching profile from auth state change (user changed), mounted:', mounted);
                         await fetchProfile(session.user.id, mounted);
                     } else {
-                        console.log('✅ User unchanged and profile exists, skipping fetch');
+                        console.log('✅ User unchanged, skipping fetch (current profile:', profile?.id, ')');
                     }
                 } else {
                     setProfile(null);
+                    currentProfileRef.current = null;
+                    currentUserIdRef.current = null;
                 }
             }
         );
 
         return () => {
             mounted = false;
-            console.log('🧹 Cleaning up auth subscription');
+            console.log('🧹 Cleaning up auth subscription - UNMOUNTING AuthProvider');
             subscription.unsubscribe();
         };
     }, []); // Empty array - run only once on mount

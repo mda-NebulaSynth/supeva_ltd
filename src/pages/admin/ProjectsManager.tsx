@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit, Trash2, Search, X, Save, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -8,6 +8,7 @@ import { MediaUpload } from '../../components/MediaUpload';
 import type { Database } from '../../lib/database.types';
 import { deleteImagesFromStorage } from '../../utils/storageCleanup';
 import { useManagerData } from '../../hooks/useManagerData';
+import debounce from 'lodash/debounce';
 
 type Project = Database['public']['Tables']['projects']['Row'];
 type ProjectInsert = Database['public']['Tables']['projects']['Insert'];
@@ -31,6 +32,8 @@ export const ProjectsManager = () => {
     const [showForm, setShowForm] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
+    const [showImagePreview, setShowImagePreview] = useState(false);
+    const [previewImageUrl, setPreviewImageUrl] = useState<string>('');
     const [formData, setFormData] = useState<ProjectInsert>({
         title: '',
         slug: '',
@@ -47,6 +50,22 @@ export const ProjectsManager = () => {
         gallery: [],
         videos: []
     });
+
+    // Debounced function for image preview
+    const debouncedSetPreview = useCallback(
+        debounce((url: string) => {
+            setPreviewImageUrl(url);
+            setShowImagePreview(true);
+        }, 800),
+        []
+    );
+
+    // Cleanup debounce on unmount
+    useEffect(() => {
+        return () => {
+            debouncedSetPreview.cancel();
+        };
+    }, [debouncedSetPreview]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -115,6 +134,7 @@ export const ProjectsManager = () => {
         });
         const mapsUrl = extractGoogleMapsUrl(project.location);
         setMapPreviewUrl(mapsUrl);
+        setShowImagePreview(false);
         setShowForm(true);
     };
 
@@ -194,6 +214,18 @@ export const ProjectsManager = () => {
         }
     };
 
+    const handleFeaturedImageChange = (url: string) => {
+        setFormData({ ...formData, featured_image: url });
+        // Reset preview state when URL changes
+        setShowImagePreview(false);
+        setPreviewImageUrl('');
+
+        // Only start debounced preview if URL looks valid
+        if (url && url.trim() && (url.startsWith('http://') || url.startsWith('https://'))) {
+            debouncedSetPreview(url);
+        }
+    };
+
     const resetForm = () => {
         setFormData({
             title: '',
@@ -212,6 +244,8 @@ export const ProjectsManager = () => {
             videos: []
         });
         setMapPreviewUrl(null);
+        setShowImagePreview(false);
+        setPreviewImageUrl('');
     };
 
     const filteredProjects = searchTerm
@@ -259,7 +293,13 @@ export const ProjectsManager = () => {
                             <motion.div className="card overflow-hidden" whileHover={{ y: -5 }}>
                                 <div className="relative h-48">
                                     {project.featured_image ? (
-                                        <img src={project.featured_image} alt={project.title} className="w-full h-full object-cover" />
+                                        <img
+                                            src={project.featured_image}
+                                            alt={project.title}
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                            decoding="async"
+                                        />
                                     ) : (
                                         <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                                             <ImageIcon className="w-12 h-12 text-gray-400" />
@@ -441,6 +481,8 @@ export const ProjectsManager = () => {
                                                                     loading="lazy"
                                                                     referrerPolicy="no-referrer-when-downgrade"
                                                                     title="Google Maps Location Preview"
+                                                                    sandbox="allow-scripts allow-same-origin allow-popups"
+                                                                // importance="low"
                                                                 />
                                                             </div>
                                                         ) : (
@@ -585,17 +627,64 @@ export const ProjectsManager = () => {
                                                     id="project-image"
                                                     type="url"
                                                     value={formData.featured_image}
-                                                    onChange={(e) => setFormData({ ...formData, featured_image: e.target.value })}
+                                                    onChange={(e) => handleFeaturedImageChange(e.target.value)}
                                                     className="input w-full text-base focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                                     placeholder="https://example.com/image.jpg"
                                                 />
+
+                                                {/* Debounced image preview */}
                                                 {formData.featured_image && (
                                                     <div className="mt-3">
-                                                        <img
-                                                            src={formData.featured_image}
-                                                            alt="Featured image preview"
-                                                            className="w-full max-w-sm h-48 object-cover rounded-lg border border-gray-200"
-                                                        />
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <span className="text-sm font-medium text-gray-700">Image Preview</span>
+                                                            {!showImagePreview && previewImageUrl && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowImagePreview(true)}
+                                                                    className="text-xs text-primary-600 hover:text-primary-700"
+                                                                >
+                                                                    Load Preview
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {showImagePreview && previewImageUrl && (
+                                                            <div className="relative w-full max-w-sm h-48 rounded-lg border border-gray-200 overflow-hidden bg-gray-100">
+                                                                <img
+                                                                    src={previewImageUrl}
+                                                                    alt="Featured image preview"
+                                                                    className="w-full h-full object-cover transition-opacity duration-300"
+                                                                    loading="lazy"
+                                                                    decoding="async"
+                                                                    onLoad={(e) => {
+                                                                        e.currentTarget.classList.add('opacity-100');
+                                                                    }}
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                        const container = e.currentTarget.parentElement;
+                                                                        if (container) {
+                                                                            container.innerHTML = `
+                                                                                <div class="flex flex-col items-center justify-center w-full h-full text-gray-500 p-4">
+                                                                                    <ImageIcon class="w-8 h-8 mb-2" />
+                                                                                    <span class="text-sm">Failed to load image</span>
+                                                                                    <button type="button" onclick="this.parentElement.parentElement.innerHTML=''" class="mt-2 text-xs text-primary-600">Dismiss</button>
+                                                                                </div>
+                                                                            `;
+                                                                        }
+                                                                    }}
+                                                                />
+                                                                <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+                                                            </div>
+                                                        )}
+
+                                                        {!showImagePreview && (
+                                                            <div className="w-full max-w-sm h-48 rounded-lg border border-gray-200 bg-gray-100 flex flex-col items-center justify-center p-4">
+                                                                <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
+                                                                <p className="text-xs text-gray-600 text-center">
+                                                                    Image preview will load automatically when you stop typing
+                                                                </p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
