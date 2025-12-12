@@ -117,18 +117,30 @@ export const SetupPasswordPage = () => {
             console.log('🔐 Starting password setup...');
 
             // Update user password
-            const { error: passwordError } = await supabase.auth.updateUser({
+            console.log('📝 Calling updateUser with password...');
+            const updateResult = await supabase.auth.updateUser({
                 password: password,
                 data: { full_name: fullName.trim() }
             });
 
-            if (passwordError) throw passwordError;
+            console.log('📋 UpdateUser response:', updateResult);
+
+            if (updateResult.error) {
+                console.error('❌ Password update error:', updateResult.error);
+                throw updateResult.error;
+            }
+
             console.log('✅ Password updated successfully');
 
+            // Small delay to let auth state settle
+            console.log('⏳ Waiting for auth state to settle...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             // Get current user
+            console.log('👤 Getting current user...');
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('User not found after password update');
-            console.log('👤 User confirmed:', user.id);
+            console.log('✅ User confirmed:', user.id);
 
             // Check if profile exists
             const { data: existingProfile, error: checkError } = await supabase
