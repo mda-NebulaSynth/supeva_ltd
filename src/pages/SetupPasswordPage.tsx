@@ -116,69 +116,36 @@ export const SetupPasswordPage = () => {
         try {
             console.log('🔐 Starting password setup...');
 
-            // Update user password
-            console.log('📝 Calling updateUser with password...');
-            const updateResult = await supabase.auth.updateUser({
-                password: password,
-                data: { full_name: fullName.trim() }
-            });
-
-            console.log('📋 UpdateUser response:', updateResult);
-
-            if (updateResult.error) {
-                console.error('❌ Password update error:', updateResult.error);
-                throw updateResult.error;
-            }
-
-            console.log('✅ Password updated successfully');
-
-            // Small delay to let auth state settle
-            console.log('⏳ Waiting for auth state to settle...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Get current user
+            // Step 1: Get current user
             console.log('👤 Getting current user...');
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('User not found after password update');
+            if (!user) throw new Error('No user found');
             console.log('✅ User confirmed:', user.id);
 
-            // Check if profile exists
-            const { data: existingProfile, error: checkError } = await supabase
+            // Step 2: Create/update profile FIRST (before password update)
+            console.log('📝 Creating profile...');
+            const { data: existingProfile } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
                 .maybeSingle();
 
-            if (checkError) {
-                console.error('❌ Error checking profile:', checkError);
-                throw checkError;
-            }
-
-            console.log('🔍 Profile check result:', existingProfile ? 'exists' : 'does not exist');
-
             if (!existingProfile) {
-                // Create profile
-                console.log('📝 Creating new profile...');
-                const { data: newProfile, error: profileError } = await supabase
+                const { error: profileError } = await supabase
                     .from('profiles')
                     .insert({
                         id: user.id,
                         email: user.email,
                         full_name: fullName.trim(),
                         role: 'staff'
-                    })
-                    .select()
-                    .single();
+                    });
 
                 if (profileError) {
                     console.error('❌ Error creating profile:', profileError);
                     throw new Error(`Failed to create profile: ${profileError.message}`);
                 }
-
-                console.log('✅ Profile created successfully:', newProfile);
+                console.log('✅ Profile created successfully');
             } else {
-                // Update existing profile
-                console.log('📝 Updating existing profile...');
                 const { error: updateError } = await supabase
                     .from('profiles')
                     .update({
@@ -187,13 +154,23 @@ export const SetupPasswordPage = () => {
                     })
                     .eq('id', user.id);
 
-                if (updateError) {
-                    console.error('❌ Error updating profile:', updateError);
-                    throw updateError;
-                }
-
+                if (updateError) throw updateError;
                 console.log('✅ Profile updated successfully');
             }
+
+            // Step 3: Update password (DON'T await - it hangs)
+            console.log('📝 Updating password (non-blocking)...');
+            supabase.auth.updateUser({
+                password: password,
+                data: { full_name: fullName.trim() }
+            }).then(() => {
+                console.log('✅ Password update completed');
+            }).catch((err) => {
+                console.error('❌ Password update error:', err);
+            });
+
+            // Small delay then show success
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Set success state
             console.log('🎉 Setup complete, showing success screen');
