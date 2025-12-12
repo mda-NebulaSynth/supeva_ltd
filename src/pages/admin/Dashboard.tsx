@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building2, FileText, Users, MessageSquare, TrendingUp, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -13,6 +14,7 @@ interface DashboardStats {
 }
 
 export const Dashboard = () => {
+    const location = useLocation();
     const [stats, setStats] = useState<DashboardStats>({
         totalProjects: 0,
         totalBlogPosts: 0,
@@ -22,7 +24,12 @@ export const Dashboard = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let mounted = true;
+
         const fetchStats = async () => {
+            console.log('📊 Fetching dashboard stats...');
+            setLoading(true);
+
             try {
                 const [projects, posts, team, contacts] = await Promise.all([
                     supabase.from('projects').select('*', { count: 'exact', head: true }),
@@ -31,21 +38,35 @@ export const Dashboard = () => {
                     supabase.from('contact_submissions').select('*', { count: 'exact', head: true })
                 ]);
 
-                setStats({
+                if (!mounted) {
+                    console.log('⚠️ Dashboard unmounted, skipping stats update');
+                    return;
+                }
+
+                const newStats = {
                     totalProjects: projects.count || 0,
                     totalBlogPosts: posts.count || 0,
                     totalTeamMembers: team.count || 0,
                     totalContacts: contacts.count || 0
-                });
+                };
+
+                console.log('✅ Dashboard stats loaded:', newStats);
+                setStats(newStats);
             } catch (error) {
-                console.error('Error fetching stats:', error);
+                console.error('❌ Error fetching stats:', error);
             } finally {
-                setLoading(false);
+                if (mounted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchStats();
-    }, []);
+
+        return () => {
+            mounted = false;
+        };
+    }, [location.pathname]); // Re-fetch when route changes
 
     const statCards = [
         {
@@ -127,45 +148,51 @@ export const Dashboard = () => {
             >
                 <h2 className="text-2xl font-display font-bold mb-6">Quick Actions</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <motion.a
-                        href="/admin/projects"
-                        className="flex items-center gap-3 p-4 rounded-lg bg-primary-50 hover:bg-primary-100 transition-colors"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                    >
-                        <Building2 className="w-6 h-6 text-primary-600" />
-                        <div>
-                            <div className="font-semibold">Manage Projects</div>
-                            <div className="text-sm text-gray-600">Add or edit properties</div>
-                        </div>
-                    </motion.a>
+                    <Link to="/admin/projects">
+                        <motion.div
+                            className="flex items-center gap-3 p-4 rounded-lg bg-primary-50 hover:bg-primary-100 transition-colors cursor-pointer"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <Building2 className="w-6 h-6 text-primary-600" />
+                            <div>
+                                <div className="font-semibold">Manage Projects</div>
+                                <div className="text-sm text-gray-600">Add or edit properties</div>
+                            </div>
+                        </motion.div>
+                    </Link>
 
-                    <motion.a
-                        href="/admin/blog"
-                        className="flex items-center gap-3 p-4 rounded-lg bg-green-50 hover:bg-green-100 transition-colors"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                    >
-                        <FileText className="w-6 h-6 text-green-600" />
-                        <div>
-                            <div className="font-semibold">Create Blog Post</div>
-                            <div className="text-sm text-gray-600">Write a new article</div>
-                        </div>
-                    </motion.a>
+                    <Link to="/admin/blog">
+                        <motion.div
+                            className="flex items-center gap-3 p-4 rounded-lg bg-green-50 hover:bg-green-100 transition-colors cursor-pointer"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <FileText className="w-6 h-6 text-green-600" />
+                            <div>
+                                <div className="font-semibold">Create Blog Post</div>
+                                <div className="text-sm text-gray-600">Write a new article</div>
+                            </div>
+                        </motion.div>
+                    </Link>
 
-                    <motion.a
+                    <a
                         href="/"
                         target="_blank"
-                        className="flex items-center gap-3 p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        rel="noopener noreferrer"
                     >
-                        <Eye className="w-6 h-6 text-purple-600" />
-                        <div>
-                            <div className="font-semibold">View Website</div>
-                            <div className="text-sm text-gray-600">See live site</div>
-                        </div>
-                    </motion.a>
+                        <motion.div
+                            className="flex items-center gap-3 p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <Eye className="w-6 h-6 text-purple-600" />
+                            <div>
+                                <div className="font-semibold">View Website</div>
+                                <div className="text-sm text-gray-600">See live site</div>
+                            </div>
+                        </motion.div>
+                    </a>
                 </div>
             </motion.div>
 
