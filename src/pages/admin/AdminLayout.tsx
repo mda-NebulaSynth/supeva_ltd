@@ -43,7 +43,7 @@ const navItems: NavItem[] = [
 ];
 
 export const AdminLayout = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true); // Start with sidebar open on desktop
     const [isMobile, setIsMobile] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
@@ -52,8 +52,17 @@ export const AdminLayout = () => {
     // Detect mobile screen
     useEffect(() => {
         const checkMobile = () => {
-            setIsMobile(window.innerWidth < 1024);
+            const mobile = window.innerWidth < 1024;
+            setIsMobile(mobile);
+
+            // Auto-manage sidebar state based on screen size
+            if (mobile) {
+                setSidebarOpen(false); // Closed by default on mobile
+            } else {
+                setSidebarOpen(true); // Open by default on desktop
+            }
         };
+
         checkMobile();
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
@@ -154,7 +163,6 @@ export const AdminLayout = () => {
                                 className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-100 rounded-full flex items-center justify-center border border-blue-200"
                                 aria-label="User menu"
                                 onClick={() => {
-                                    // Show mobile user info or open dropdown
                                     const userInfo = document.getElementById('mobile-user-info');
                                     if (userInfo) {
                                         userInfo.classList.toggle('hidden');
@@ -199,31 +207,28 @@ export const AdminLayout = () => {
                 </div>
             </motion.header>
 
-            {/* Sidebar */}
+            {/* Mobile Sidebar Overlay */}
             <AnimatePresence>
-                {(sidebarOpen || !isMobile) && (
+                {sidebarOpen && isMobile && (
                     <>
-                        {/* Mobile Backdrop */}
-                        {isMobile && (
-                            <motion.div
-                                className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                onClick={() => setSidebarOpen(false)}
-                            />
-                        )}
+                        <motion.div
+                            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSidebarOpen(false)}
+                        />
 
-                        {/* Sidebar Panel */}
+                        {/* Mobile Sidebar */}
                         <motion.aside
-                            className={`fixed left-0 top-16 bottom-0 w-64 bg-white shadow-xl z-40 border-r border-gray-200 lg:translate-x-0 lg:z-30 ${isMobile ? 'overflow-y-auto' : ''}`}
-                            initial={isMobile ? { x: '-100%' } : false}
+                            className="fixed left-0 top-16 bottom-0 w-64 bg-white shadow-xl z-40 border-r border-gray-200 overflow-y-auto"
+                            initial={{ x: '-100%' }}
                             animate={{ x: 0 }}
-                            exit={isMobile ? { x: '-100%' } : undefined}
+                            exit={{ x: '-100%' }}
                             transition={{ duration: 0.3, type: 'tween' }}
                         >
-                            {/* User Info for Mobile */}
-                            <div className="md:hidden p-4 border-b border-gray-200">
+                            {/* Mobile User Info */}
+                            <div className="p-4 border-b border-gray-200">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
                                         <span className="text-white font-medium text-sm">
@@ -246,12 +251,12 @@ export const AdminLayout = () => {
                                 </div>
                             </div>
 
-                            {/* Navigation */}
+                            {/* Mobile Navigation */}
                             <nav className="p-4 space-y-1">
                                 {visibleNavItems.map((item, index) => {
                                     const Icon = item.icon;
-                                    const isActive = location.pathname === item.path || 
-                                                    (item.path !== '/admin' && location.pathname.startsWith(item.path));
+                                    const isActive = location.pathname === item.path ||
+                                        (item.path !== '/admin' && location.pathname.startsWith(item.path));
 
                                     return (
                                         <motion.div
@@ -263,10 +268,10 @@ export const AdminLayout = () => {
                                             <Link
                                                 to={item.path}
                                                 className={`flex items-center justify-between px-3 py-3 rounded-lg transition-all ${isActive
-                                                        ? 'bg-blue-600 text-white shadow-sm'
-                                                        : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                    : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
                                                     }`}
-                                                onClick={() => isMobile && setSidebarOpen(false)}
+                                                onClick={() => setSidebarOpen(false)}
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className={`p-2 rounded-lg ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
@@ -284,40 +289,87 @@ export const AdminLayout = () => {
                                     );
                                 })}
 
-                                {/* Home Link */}
-                                <motion.div
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: visibleNavItems.length * 0.05 }}
+                                <Link
+                                    to="/"
+                                    className="flex items-center gap-3 px-3 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-all mt-4 border-t border-gray-200 pt-4"
+                                    onClick={() => setSidebarOpen(false)}
                                 >
-                                    <Link
-                                        to="/"
-                                        className="flex items-center gap-3 px-3 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-all mt-4 border-t border-gray-200 pt-4"
-                                        onClick={() => isMobile && setSidebarOpen(false)}
-                                    >
-                                        <Home className="w-4 h-4 text-gray-500" />
-                                        <span className="font-medium text-sm">Back to Website</span>
-                                    </Link>
-                                </motion.div>
+                                    <Home className="w-4 h-4 text-gray-500" />
+                                    <span className="font-medium text-sm">Back to Website</span>
+                                </Link>
                             </nav>
-
-                            {/* Version/Footer */}
-                            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-                                <p className="text-xs text-gray-500 text-center">
-                                    Admin v1.0 • {new Date().getFullYear()}
-                                </p>
-                            </div>
                         </motion.aside>
                     </>
                 )}
             </AnimatePresence>
 
-            {/* Main Content */}
-            <main className={`pt-16 min-h-screen transition-all duration-300 ${!isMobile && sidebarOpen ? 'lg:pl-64' : 'lg:pl-0'}`}>
-                <div className="p-4 sm:p-6">
-                    <Outlet />
-                </div>
-            </main>
+            {/* Main Layout - Desktop & Mobile */}
+            <div className={`pt-16 min-h-screen transition-all duration-300 ${!isMobile ? 'lg:flex' : ''}`}>
+                {/* Desktop Sidebar - Always visible, part of layout */}
+                {!isMobile && (
+                    <motion.aside
+                        className={`hidden lg:flex flex-col w-64 bg-white border-r border-gray-200 ${sidebarOpen ? '' : 'w-0'}`}
+                        initial={{ width: 256 }}
+                        animate={{ width: sidebarOpen ? 256 : 0 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        <div className="flex-1 overflow-y-auto sticky top-16">
+                            {/* Desktop Navigation */}
+                            <nav className="p-4 space-y-1">
+                                {visibleNavItems.map((item, index) => {
+                                    const Icon = item.icon;
+                                    const isActive = location.pathname === item.path ||
+                                        (item.path !== '/admin' && location.pathname.startsWith(item.path));
+
+                                    return (
+                                        <motion.div
+                                            key={item.path}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.05 }}
+                                        >
+                                            <Link
+                                                to={item.path}
+                                                className={`flex items-center justify-between px-3 py-3 rounded-lg transition-all ${isActive
+                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                    : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`p-2 rounded-lg ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
+                                                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-gray-600'}`} />
+                                                    </div>
+                                                    <span className="font-medium text-sm">{item.label}</span>
+                                                </div>
+                                                {isActive ? (
+                                                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                ) : (
+                                                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                                                )}
+                                            </Link>
+                                        </motion.div>
+                                    );
+                                })}
+
+                                <Link
+                                    to="/"
+                                    className="flex items-center gap-3 px-3 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-all mt-4 border-t border-gray-200 pt-4"
+                                >
+                                    <Home className="w-4 h-4 text-gray-500" />
+                                    <span className="font-medium text-sm">Back to Website</span>
+                                </Link>
+                            </nav>
+                        </div>
+                    </motion.aside>
+                )}
+
+                {/* Main Content Area */}
+                <main className={`flex-1 transition-all duration-300 ${!isMobile && sidebarOpen ? 'lg:ml-0' : 'lg:ml-0'}`}>
+                    <div className="p-4 sm:p-6 lg:p-8">
+                        <Outlet />
+                    </div>
+                </main>
+            </div>
         </div>
     );
 };

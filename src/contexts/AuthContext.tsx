@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode, useCallback } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -50,27 +50,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [session, setSession] = useState<Session | null>(null);
     const [profile, setProfile] = useState<AdminProfile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [stabilizedLoading, setStabilizedLoading] = useState(true);
-    const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-    const [isSettingUp, setIsSettingUp] = useState(false); // NEW: Track if we're in setup mode
-
-    // Stabilize loading state to prevent flicker
-    useEffect(() => {
-        let timeoutId: number;
-
-        if (loading) {
-            setStabilizedLoading(true);
-        } else {
-            // Keep loading visible for at least 300ms to prevent flicker
-            timeoutId = window.setTimeout(() => {
-                setStabilizedLoading(false);
-            }, 300);
-        }
-
-        return () => {
-            if (timeoutId) window.clearTimeout(timeoutId);
-        };
-    }, [loading]);
 
     // Derived states for role checks
     const isDeveloper = profile?.role === 'developer';
@@ -78,144 +57,138 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const isStaff = profile?.role === 'staff';
     const isActiveAdmin = Boolean(profile);
 
-    const fetchProfile = async (userId: string) => {
+    // Define fetchProfile directly inside the component (not useCallback)
+    // This prevents dependency array issues in useEffect
+    const fetchProfile = async (userId: string, mountedRef?: boolean) => {
         try {
-            console.log('🔍 Fetching profile for user:', userId);
+            console.log('🔍 Fetching profile for user:', userId, 'mounted:', mountedRef);
 
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
-                .maybeSingle();
+                .single();
 
-            console.log('📦 Supabase response - data:', data, 'error:', error);
+            console.log('📡 Fetch complete - data:', !!data, 'error:', error?.message, 'mounted check:', mountedRef);
 
             if (error) {
-                if (error.code === 'PGRST116') {
-                    console.log('🆕 No profile found for user:', userId);
-                } else {
-                    console.error('❌ Error fetching profile:', error);
-                }
+                console.error('❌ Error fetching profile:', error);
                 setProfile(null);
-                return;
+                return null;
             }
 
             if (!data) {
                 console.log('⚠️ No profile found for user:', userId);
                 setProfile(null);
-                return;
+                return null;
             }
 
             const profileData = data as AdminProfile;
             console.log('✅ Profile fetched successfully:', profileData);
-
-            console.log('🎉 Setting profile state:', profileData);
+            console.log('📝 Setting profile state...');
             setProfile(profileData);
+            console.log('✔️ Profile state updated');
+            return profileData;
         } catch (error) {
             console.error('💥 Exception in fetchProfile:', error);
             setProfile(null);
+            return null;
         }
     };
 
-    const refreshProfile = async () => {
-        if (user && !isSettingUp) { // Don't refresh if we're setting up
+    const refreshProfile = useCallback(async () => {
+        if (user) {
             await fetchProfile(user.id);
         }
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]); // fetchProfile is stable, intentionally not in deps
 
-    // Get initial session
-    const initializeAuth = async () => {
-        try {
-            console.log('🔄 Initializing auth...');
+    useEffect(() => {
+        let mounted = true;
+        let initializing = true;
 
-            // Check if we're on setup-password page
-            const isSetupPage = window.location.pathname.includes('/setup-password');
-            if (isSetupPage) {
-                console.log('🎯 On setup page, delaying profile fetch');
-                setIsSettingUp(true);
-            }
+        console.log('🎬 AuthProvider useEffect starting');
 
-            const { data: { session }, error } = await supabase.auth.getSession();
+        // Get initial session
+        const initializeAuth = async () => {
+            try {
+                console.log('🔄 Initializing auth... (mounted:', mounted, ')');
 
-            if (error) {
-                console.error('❌ Error getting session:', error);
-            } else {
+                const { data: { session }, error } = await supabase.auth.getSession();
+
+                console.log('📦 getSession response:', { hasSession: !!session, error: error?.message, stillMounted: mounted });
+
+                if (error) {
+                    console.error('❌ Error getting session:', error);
+                    if (mounted) setLoading(false);
+                    initializing = false;
+                    return;
+                }
+
                 console.log('📋 Session retrieved:', session?.user?.id);
+
+                if (!mounted) {
+                    console.log('⚠️ Component unmounted before session processing');
+                    initializing = false;
+                    return;
+                }
+
                 setSession(session);
                 setUser(session?.user ?? null);
 
-                if (session?.user && !isSetupPage) {
-                    // Check if this is a new invited user
-                    const hash = window.location.hash;
-                    const params = new URLSearchParams(window.location.search);
-                    const isNewInvitedUser =
-                        (hash.includes('access_token') && hash.includes('type=invite')) ||
-                        (params.has('access_token') && params.get('type') === 'invite');
-
-                    if (isNewInvitedUser) {
-                        console.log('🎯 New invited user - skipping profile check');
-                        setProfile(null);
-                    } else {
-                        await fetchProfile(session.user.id);
-                    }
+                if (session?.user) {
+                    console.log('🎯 About to fetch profile, mounted:', mounted);
+                    const result = await fetchProfile(session.user.id, mounted);
+                    console.log('📥 fetchProfile returned:', !!result, 'stillMounted:', mounted);
+                }
+            } catch (error) {
+                console.error('💥 Exception during auth initialization:', error);
+            } finally {
+                console.log('🏁 Initial auth load complete (mounted:', mounted, ')');
+                if (mounted) {
+                    setLoading(false);
+                    initializing = false;
                 }
             }
-        } catch (error) {
-            console.error('💥 Exception during auth initialization:', error);
-        } finally {
-            console.log('🏁 Initial auth load complete');
-            setLoading(false);
-            setInitialLoadComplete(true);
-        }
-    };
+        };
 
-    useEffect(() => {
-        // Initialize auth
         initializeAuth();
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
-                console.log('👂 Auth state changed:', _event, session?.user?.id);
-
-                // CRITICAL FIX: Check current page BEFORE any logic
-                const isSetupPage = window.location.pathname.includes('/setup-password');
-                const hasInviteToken = window.location.hash.includes('access_token') ||
-                    new URLSearchParams(window.location.search).has('access_token');
-
-                // If we're on setup page OR have invite tokens, skip updates
-                if (isSetupPage || hasInviteToken) {
-                    console.log('⏭️ Skipping auth update - on setup page or has invite');
-                    setIsSettingUp(true);
+                // CRITICAL: Skip auth state changes during initial load
+                // This prevents duplicate profile fetches
+                if (initializing) {
+                    console.log('⏭️ Skipping auth state change during initialization:', _event);
                     return;
                 }
 
-                // Reset setup flag if we're not on setup page anymore
-                setIsSettingUp(false);
+                if (!mounted) {
+                    console.log('⚠️ Auth state change but component unmounted');
+                    return;
+                }
 
-                // Update session and user state
+                console.log('👂 Auth state changed:', _event, session?.user?.id, 'mounted:', mounted);
+
                 setSession(session);
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
-                    await fetchProfile(session.user.id);
+                    console.log('🎯 Fetching profile from auth state change, mounted:', mounted);
+                    await fetchProfile(session.user.id, mounted);
                 } else {
                     setProfile(null);
-                }
-
-                // Only set loading false after initial load
-                if (!initialLoadComplete) {
-                    setLoading(false);
-                    setInitialLoadComplete(true);
                 }
             }
         );
 
         return () => {
+            mounted = false;
             console.log('🧹 Cleaning up auth subscription');
             subscription.unsubscribe();
         };
-    }, []);
+    }, []); // Empty array - run only once on mount
 
     const signIn = async (email: string, password: string) => {
         setLoading(true);
@@ -271,7 +244,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         user,
         session,
         profile,
-        loading: stabilizedLoading,
+        loading,
         isDeveloper,
         isFounder,
         isStaff,
