@@ -74,7 +74,6 @@ export const ProjectUpdatesManager = () => {
                     images: formData.images,
                     video_url: formData.video_url,
                     author_id: formData.author_id || user?.id || null,
-                    updated_at: new Date().toISOString()
                 };
 
                 const { error } = await supabase
