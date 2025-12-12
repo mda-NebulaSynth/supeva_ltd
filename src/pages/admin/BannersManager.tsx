@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, ExternalLink, ToggleLeft, ToggleRight, MapPin, Info, Image as ImageIcon, AlertCircle, Link, Globe, Upload, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -13,6 +14,8 @@ type AdBannerInsert = Database['public']['Tables']['ad_banners']['Insert'];
 type AdBannerUpdate = Database['public']['Tables']['ad_banners']['Update'];
 
 export const BannersManager = () => {
+    const location = useLocation();
+    const mountedRef = useRef(true);
     const [banners, setBanners] = useState<AdBanner[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -30,11 +33,17 @@ export const BannersManager = () => {
     }>({});
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchBanners();
-    }, []);
+
+        return () => {
+            mountedRef.current = false;
+        };
+    }, [location.key]); // Refetch when navigating to this page
 
     const fetchBanners = async () => {
         try {
+            console.log('📋 Fetching banners...');
             setLoading(true);
             const { data, error } = await supabase
                 .from('ad_banners')
@@ -42,11 +51,20 @@ export const BannersManager = () => {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
+
+            if (!mountedRef.current) {
+                console.log('⚠️ BannersManager unmounted, skipping state update');
+                return;
+            }
+
+            console.log('✅ Banners loaded:', data?.length || 0);
             setBanners(data || []);
         } catch (error) {
-            console.error('Error fetching banners:', error);
+            console.error('❌ Error fetching banners:', error);
         } finally {
-            setLoading(false);
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -88,6 +106,8 @@ export const BannersManager = () => {
         }
 
         try {
+            console.log('💾 Saving banner...');
+
             if (editingBanner) {
                 const updateData: AdBannerUpdate = {
                     slot_id: formData.slot_id,
@@ -103,6 +123,7 @@ export const BannersManager = () => {
                     .eq('id', editingBanner.id);
 
                 if (error) throw error;
+                console.log('✅ Banner updated successfully');
             } else {
                 const insertData: AdBannerInsert = {
                     slot_id: formData.slot_id,
@@ -117,6 +138,12 @@ export const BannersManager = () => {
                     .insert(insertData);
 
                 if (error) throw error;
+                console.log('✅ Banner created successfully');
+            }
+
+            if (!mountedRef.current) {
+                console.log('⚠️ Component unmounted after save');
+                return;
             }
 
             setFormData({
@@ -128,15 +155,18 @@ export const BannersManager = () => {
             setErrors({});
             setShowForm(false);
             setEditingBanner(null);
-            fetchBanners();
+            await fetchBanners();
         } catch (error) {
-            console.error('Error saving banner:', error);
-            alert('Failed to save banner. Please try again.');
+            console.error('❌ Error saving banner:', error);
+            if (mountedRef.current) {
+                alert('Failed to save banner. Please try again.');
+            }
         }
     };
 
     const toggleActive = async (banner: AdBanner) => {
         try {
+            console.log('🔄 Toggling banner status...');
             const updateData: AdBannerUpdate = {
                 active: !banner.active
             };
@@ -148,10 +178,15 @@ export const BannersManager = () => {
                 .eq('id', banner.id);
 
             if (error) throw error;
-            fetchBanners();
+            console.log('✅ Banner status toggled');
+
+            if (!mountedRef.current) return;
+            await fetchBanners();
         } catch (error) {
-            console.error('Error toggling banner:', error);
-            alert('Failed to update banner status. Please try again.');
+            console.error('❌ Error toggling banner:', error);
+            if (mountedRef.current) {
+                alert('Failed to update banner status. Please try again.');
+            }
         }
     };
 
@@ -171,6 +206,7 @@ export const BannersManager = () => {
         if (!confirm('Are you sure you want to delete this banner? This action cannot be undone.')) return;
 
         try {
+            console.log('🗑️ Deleting banner...');
             const banner = banners.find(b => b.id === id);
 
             if (banner?.image_url) {
@@ -183,10 +219,15 @@ export const BannersManager = () => {
                 .eq('id', id);
 
             if (error) throw error;
-            fetchBanners();
+            console.log('✅ Banner deleted successfully');
+
+            if (!mountedRef.current) return;
+            await fetchBanners();
         } catch (error) {
-            console.error('Error deleting banner:', error);
-            alert('Failed to delete banner. Please try again.');
+            console.error('❌ Error deleting banner:', error);
+            if (mountedRef.current) {
+                alert('Failed to delete banner. Please try again.');
+            }
         }
     };
 

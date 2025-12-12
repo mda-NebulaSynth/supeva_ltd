@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Star, ToggleLeft, ToggleRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -6,13 +6,24 @@ import { Database } from '../../lib/database.types';
 import { StaggeredList, StaggeredItem } from '../../components/animated/StaggeredList';
 import { MediaUpload } from '../../components/MediaUpload';
 import { deleteImageFromStorage } from '../../utils/storageCleanup';
+import { useManagerData } from '../../hooks/useManagerData';
 
 type Testimonial = Database['public']['Tables']['testimonials']['Row'];
 type TestimonialInsert = Database['public']['Tables']['testimonials']['Insert'];
 
 export const TestimonialsManager = () => {
-    const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data: testimonials, loading, refetch, mountedRef } = useManagerData<Testimonial>(
+        async () => {
+            const { data, error } = await supabase
+                .from('testimonials')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+        },
+        'TestimonialsManager'
+    );
     const [showForm, setShowForm] = useState(false);
     const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null);
     const [formData, setFormData] = useState<TestimonialInsert>({
@@ -24,31 +35,13 @@ export const TestimonialsManager = () => {
         active: true
     });
 
-    useEffect(() => {
-        fetchTestimonials();
-    }, []);
-
-    const fetchTestimonials = async () => {
-        try {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('testimonials')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setTestimonials(data || []);
-        } catch (error) {
-            console.error('Error fetching testimonials:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         try {
+            console.log('💾 Saving testimonial...');
+
             if (editingTestimonial) {
                 const updateData: Database['public']['Tables']['testimonials']['Update'] = {
                     name: formData.name,
@@ -66,6 +59,7 @@ export const TestimonialsManager = () => {
                     .eq('id', editingTestimonial.id);
 
                 if (error) throw error;
+                console.log('✅ Testimonial updated');
             } else {
                 const insertData: TestimonialInsert = {
                     name: formData.name || '',
@@ -82,7 +76,10 @@ export const TestimonialsManager = () => {
                     .insert(insertData);
 
                 if (error) throw error;
+                console.log('✅ Testimonial created');
             }
+
+            if (!mountedRef.current) return;
 
             // Reset form and refresh
             setFormData({
@@ -95,10 +92,12 @@ export const TestimonialsManager = () => {
             });
             setShowForm(false);
             setEditingTestimonial(null);
-            fetchTestimonials();
+            await refetch();
         } catch (error) {
-            console.error('Error saving testimonial:', error);
-            alert('Failed to save testimonial. Please try again.');
+            console.error('❌ Error saving testimonial:', error);
+            if (mountedRef.current) {
+                alert('Failed to save testimonial. Please try again.');
+            }
         }
     };
 
@@ -119,6 +118,7 @@ export const TestimonialsManager = () => {
         if (!confirm('Are you sure you want to delete this testimonial?')) return;
 
         try {
+            console.log('🗑️ Deleting testimonial...');
             // Find the testimonial to get its image URL before deletion
             const testimonial = testimonials.find(t => t.id === id);
 
@@ -134,15 +134,21 @@ export const TestimonialsManager = () => {
                 .eq('id', id);
 
             if (error) throw error;
-            fetchTestimonials();
+            console.log('✅ Testimonial deleted');
+
+            if (!mountedRef.current) return;
+            await refetch();
         } catch (error) {
-            console.error('Error deleting testimonial:', error);
-            alert('Failed to delete testimonial. Please try again.');
+            console.error('❌ Error deleting testimonial:', error);
+            if (mountedRef.current) {
+                alert('Failed to delete testimonial. Please try again.');
+            }
         }
     };
 
     const toggleActive = async (testimonial: Testimonial) => {
         try {
+            console.log('💾 Saving testimonial status...');
             const updateData: Database['public']['Tables']['testimonials']['Update'] = {
                 active: !testimonial.active
             };
@@ -154,10 +160,15 @@ export const TestimonialsManager = () => {
                 .eq('id', testimonial.id);
 
             if (error) throw error;
-            fetchTestimonials();
+            console.log('✅ Testimonial status updated');
+
+            if (!mountedRef.current) return;
+            await refetch();
         } catch (error) {
-            console.error('Error toggling testimonial:', error);
-            alert('Failed to update testimonial status. Please try again.');
+            console.error('❌ Error toggling testimonial:', error);
+            if (mountedRef.current) {
+                alert('Failed to update testimonial status. Please try again.');
+            }
         }
     };
 

@@ -1,17 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
 import { MediaUpload } from '../../components/MediaUpload';
 import { deleteImageFromStorage } from '../../utils/storageCleanup';
+import { useManagerData } from '../../hooks/useManagerData';
 
 type TeamMember = Database['public']['Tables']['team_members']['Row'];
 type TeamMemberInsert = Database['public']['Tables']['team_members']['Insert'];
 type TeamMemberUpdate = Database['public']['Tables']['team_members']['Update'];
 
 export const TeamManager = () => {
-    const [members, setMembers] = useState<TeamMember[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data: members, loading, refetch, mountedRef } = useManagerData<TeamMember>(
+        async () => {
+            const { data, error } = await supabase
+                .from('team_members')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+        },
+        'TeamManager'
+    );
+
     const [searchQuery, setSearchQuery] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
@@ -26,31 +38,12 @@ export const TeamManager = () => {
         managed_by: null
     });
 
-    useEffect(() => {
-        fetchMembers();
-    }, []);
-
-    const fetchMembers = async () => {
-        try {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('team_members')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setMembers(data || []);
-        } catch (error) {
-            console.error('Error fetching team members:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         try {
+            console.log('💾 Saving team member...');
+
             if (editingMember) {
                 const payload: TeamMemberUpdate = {
                     ...formData,
@@ -63,6 +56,7 @@ export const TeamManager = () => {
                     .eq('id', editingMember.id);
 
                 if (error) throw error;
+                console.log('✅ Team member updated');
             } else {
                 const payload: TeamMemberInsert = {
                     ...formData,
@@ -73,15 +67,20 @@ export const TeamManager = () => {
                     .insert([payload]);
 
                 if (error) throw error;
+                console.log('✅ Team member created');
             }
+
+            if (!mountedRef.current) return;
 
             setShowModal(false);
             setEditingMember(null);
             resetForm();
-            fetchMembers();
+            await refetch();
         } catch (error) {
-            console.error('Error saving team member:', error);
-            alert('Failed to save team member');
+            console.error('❌ Error saving team member:', error);
+            if (mountedRef.current) {
+                alert('Failed to save team member');
+            }
         }
     };
 
@@ -89,6 +88,7 @@ export const TeamManager = () => {
         if (!confirm('Are you sure you want to delete this team member?')) return;
 
         try {
+            console.log('🗑️ Deleting team member...');
             const member = members.find(m => m.id === id);
 
             if (member?.image) {
@@ -101,10 +101,15 @@ export const TeamManager = () => {
                 .eq('id', id);
 
             if (error) throw error;
-            fetchMembers();
+            console.log('✅ Team member deleted');
+
+            if (!mountedRef.current) return;
+            await refetch();
         } catch (error) {
-            console.error('Error deleting team member:', error);
-            alert('Failed to delete team member');
+            console.error('❌ Error deleting team member:', error);
+            if (mountedRef.current) {
+                alert('Failed to delete team member');
+            }
         }
     };
 

@@ -4,50 +4,46 @@ import { Mail, Phone, Calendar, MessageSquare, Trash2, Eye, Filter, Search, X } 
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
 import { StaggeredList, StaggeredItem } from '../../components/animated/StaggeredList';
+import { useManagerData } from '../../hooks/useManagerData';
 
 type ContactSubmission = Database['public']['Tables']['contact_submissions']['Row'];
 type ContactSubmissionUpdate = Database['public']['Tables']['contact_submissions']['Update'];
 type Project = { id: string; title: string };
 
 export const ContactsManager = () => {
-    const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
+    const { data: submissions, loading, refetch, mountedRef } = useManagerData<ContactSubmission>(
+        async () => {
+            const { data, error } = await supabase
+                .from('contact_submissions')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+        },
+        'ContactsManager'
+    );
+
     const [projects, setProjects] = useState<Project[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedStatus, setSelectedStatus] = useState<'all' | 'new' | 'contacted' | 'closed'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmission | null>(null);
     const [showDetails, setShowDetails] = useState(false);
 
+    // Fetch projects separately (not part of the main data hook)
     useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-
-            const { data: submissionsData, error: submissionsError } = await supabase
-                .from('contact_submissions')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (submissionsError) throw submissionsError;
-
+        const fetchProjects = async () => {
             const { data: projectsData } = await supabase
                 .from('projects')
                 .select('id, title');
-
-            setSubmissions(submissionsData || []);
             setProjects(projectsData || []);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+        };
+        fetchProjects();
+    }, []);
 
     const updateStatus = async (id: string, status: 'new' | 'contacted' | 'closed') => {
         try {
+            console.log('💾 Saving contact status...');
             const updateData: ContactSubmissionUpdate = { status };
 
             const { error } = await supabase
@@ -57,14 +53,19 @@ export const ContactsManager = () => {
                 .eq('id', id);
 
             if (error) throw error;
-            fetchData();
+            console.log('✅ Contact status updated');
+
+            if (!mountedRef.current) return;
+            await refetch();
 
             if (selectedSubmission?.id === id) {
                 setSelectedSubmission({ ...selectedSubmission, status });
             }
         } catch (error) {
-            console.error('Error updating status:', error);
-            alert('Failed to update status. Please try again.');
+            console.error('❌ Error updating status:', error);
+            if (mountedRef.current) {
+                alert('Failed to update status. Please try again.');
+            }
         }
     };
 
@@ -72,21 +73,27 @@ export const ContactsManager = () => {
         if (!confirm('Are you sure you want to delete this submission?')) return;
 
         try {
+            console.log('🗑️ Deleting contact submission...');
             const { error } = await supabase
                 .from('contact_submissions')
                 .delete()
                 .eq('id', id);
 
             if (error) throw error;
-            fetchData();
+            console.log('✅ Contact submission deleted');
+
+            if (!mountedRef.current) return;
+            await refetch();
 
             if (selectedSubmission?.id === id) {
                 setShowDetails(false);
                 setSelectedSubmission(null);
             }
         } catch (error) {
-            console.error('Error deleting submission:', error);
-            alert('Failed to delete submission. Please try again.');
+            console.error('❌ Error deleting submission:', error);
+            if (mountedRef.current) {
+                alert('Failed to delete submission. Please try again.');
+            }
         }
     };
 

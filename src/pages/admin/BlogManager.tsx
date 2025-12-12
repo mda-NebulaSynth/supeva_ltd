@@ -1,18 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Edit2, Trash2, Search, AlertCircle, FileText, Link, Tag, Type, Globe, Image as ImageIcon, X, Eye, EyeOff, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
 import { useAuth } from '../../contexts/AuthContext';
 import { MediaUpload } from '../../components/MediaUpload';
 import { deleteImageFromStorage } from '../../utils/storageCleanup';
+import { useManagerData } from '../../hooks/useManagerData';
 
 type BlogPost = Database['public']['Tables']['blog_posts']['Row'];
 type BlogPostInsert = Database['public']['Tables']['blog_posts']['Insert'];
 
 export const BlogManager = () => {
     const { user } = useAuth();
-    const [posts, setPosts] = useState<BlogPost[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data: posts, loading, refetch, mountedRef } = useManagerData<BlogPost>(
+        async () => {
+            const { data, error } = await supabase
+                .from('blog_posts')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+        },
+        'BlogManager'
+    );
     const [searchQuery, setSearchQuery] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
@@ -36,26 +47,6 @@ export const BlogManager = () => {
         featured_image?: string;
     }>({});
 
-    useEffect(() => {
-        fetchPosts();
-    }, []);
-
-    const fetchPosts = async () => {
-        try {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('blog_posts')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setPosts(data || []);
-        } catch (error) {
-            console.error('Error fetching blog posts:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const validateForm = () => {
         const newErrors: typeof errors = {};
@@ -94,6 +85,8 @@ export const BlogManager = () => {
         }
 
         try {
+            console.log('💾 Saving blog post...');
+
             if (editingPost) {
                 const updateData: Database['public']['Tables']['blog_posts']['Update'] = {
                     title: formData.title,
@@ -115,6 +108,7 @@ export const BlogManager = () => {
                     .eq('id', editingPost.id);
 
                 if (error) throw error;
+                console.log('✅ Blog post updated');
             } else {
                 const insertData: BlogPostInsert = {
                     title: formData.title || '',
@@ -135,16 +129,21 @@ export const BlogManager = () => {
                     .insert(insertData);
 
                 if (error) throw error;
+                console.log('✅ Blog post created');
             }
+
+            if (!mountedRef.current) return;
 
             setShowModal(false);
             setEditingPost(null);
             resetForm();
             setErrors({});
-            fetchPosts();
+            await refetch();
         } catch (error) {
-            console.error('Error saving blog post:', error);
-            alert('Failed to save blog post. Please try again.');
+            console.error('❌ Error saving blog post:', error);
+            if (mountedRef.current) {
+                alert('Failed to save blog post. Please try again.');
+            }
         }
     };
 
@@ -152,6 +151,7 @@ export const BlogManager = () => {
         if (!confirm('Are you sure you want to delete this blog post? This action cannot be undone.')) return;
 
         try {
+            console.log('🗑️ Deleting blog post...');
             const post = posts.find(p => p.id === id);
 
             if (post?.featured_image) {
@@ -164,10 +164,15 @@ export const BlogManager = () => {
                 .eq('id', id);
 
             if (error) throw error;
-            fetchPosts();
+            console.log('✅ Blog post deleted');
+
+            if (!mountedRef.current) return;
+            await refetch();
         } catch (error) {
-            console.error('Error deleting blog post:', error);
-            alert('Failed to delete blog post. Please try again.');
+            console.error('❌ Error deleting blog post:', error);
+            if (mountedRef.current) {
+                alert('Failed to delete blog post. Please try again.');
+            }
         }
     };
 

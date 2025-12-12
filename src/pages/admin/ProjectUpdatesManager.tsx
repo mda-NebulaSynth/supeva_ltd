@@ -7,6 +7,7 @@ import { StaggeredList, StaggeredItem } from '../../components/animated/Staggere
 import { MediaUpload } from '../../components/MediaUpload';
 import { deleteImagesFromStorage } from '../../utils/storageCleanup';
 import { useAuth } from '../../contexts/AuthContext';
+import { useManagerData } from '../../hooks/useManagerData';
 
 type ProjectUpdate = Database['public']['Tables']['project_updates']['Row'];
 type ProjectUpdateInsert = Database['public']['Tables']['project_updates']['Insert'];
@@ -15,9 +16,20 @@ type Project = { id: string; title: string };
 
 export const ProjectUpdatesManager = () => {
     const { user } = useAuth();
-    const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
+    const { data: updates, loading, refetch, mountedRef } = useManagerData<ProjectUpdate>(
+        async () => {
+            const { data, error } = await supabase
+                .from('project_updates')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+        },
+        'ProjectUpdatesManager'
+    );
+
     const [projects, setProjects] = useState<Project[]>([]);
-    const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingUpdate, setEditingUpdate] = useState<ProjectUpdate | null>(null);
     const [selectedProject, setSelectedProject] = useState<string>('all');
@@ -30,41 +42,30 @@ export const ProjectUpdatesManager = () => {
         author_id: null
     });
 
+    // Fetch projects separately (not part of the main data hook)
     useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-
-            const { data: updatesData, error: updatesError } = await supabase
-                .from('project_updates')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (updatesError) throw updatesError;
-
+        const fetchProjects = async () => {
             const { data: projectsData, error: projectsError } = await supabase
                 .from('projects')
                 .select('id, title')
                 .order('title');
 
-            if (projectsError) throw projectsError;
+            if (projectsError) {
+                console.error('Error fetching projects:', projectsError);
+                return;
+            }
 
-            setUpdates(updatesData || []);
             setProjects(projectsData || []);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+        };
+        fetchProjects();
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         try {
+            console.log('💾 Saving project update...');
+
             if (editingUpdate) {
                 const updateData: ProjectUpdateUpdate = {
                     project_id: formData.project_id,
@@ -83,6 +84,7 @@ export const ProjectUpdatesManager = () => {
                     .eq('id', editingUpdate.id);
 
                 if (error) throw error;
+                console.log('✅ Project update updated');
             } else {
                 const insertData: ProjectUpdateInsert = {
                     ...formData,
@@ -95,13 +97,18 @@ export const ProjectUpdatesManager = () => {
                     .insert([insertData]);
 
                 if (error) throw error;
+                console.log('✅ Project update created');
             }
 
+            if (!mountedRef.current) return;
+
             resetForm();
-            fetchData();
+            await refetch();
         } catch (error) {
-            console.error('Error saving update:', error);
-            alert('Failed to save update. Please try again.');
+            console.error('❌ Error saving update:', error);
+            if (mountedRef.current) {
+                alert('Failed to save update. Please try again.');
+            }
         }
     };
 
@@ -122,6 +129,7 @@ export const ProjectUpdatesManager = () => {
         if (!confirm('Are you sure you want to delete this update?')) return;
 
         try {
+            console.log('🗑️ Deleting project update...');
             const update = updates.find(u => u.id === id);
 
             if (update?.images && update.images.length > 0) {
@@ -134,10 +142,15 @@ export const ProjectUpdatesManager = () => {
                 .eq('id', id);
 
             if (error) throw error;
-            fetchData();
+            console.log('✅ Project update deleted');
+
+            if (!mountedRef.current) return;
+            await refetch();
         } catch (error) {
-            console.error('Error deleting update:', error);
-            alert('Failed to delete update. Please try again.');
+            console.error('❌ Error deleting update:', error);
+            if (mountedRef.current) {
+                alert('Failed to delete update. Please try again.');
+            }
         }
     };
 

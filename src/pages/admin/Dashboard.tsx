@@ -66,7 +66,7 @@ export const Dashboard = () => {
         return () => {
             mounted = false;
         };
-    }, [location.pathname]); // Re-fetch when route changes
+    }, [location.key]); // Re-fetch when navigation occurs (use key instead of pathname)
 
     const statCards = [
         {

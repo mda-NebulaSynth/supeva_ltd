@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit, Trash2, Search, X, Save, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -7,14 +7,26 @@ import { fadeInUp } from '../../utils/animations';
 import { MediaUpload } from '../../components/MediaUpload';
 import type { Database } from '../../lib/database.types';
 import { deleteImagesFromStorage } from '../../utils/storageCleanup';
+import { useManagerData } from '../../hooks/useManagerData';
 
 type Project = Database['public']['Tables']['projects']['Row'];
 type ProjectInsert = Database['public']['Tables']['projects']['Insert'];
 type ProjectUpdate = Database['public']['Tables']['projects']['Update'];
 
 export const ProjectsManager = () => {
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data: projects, loading, refetch, mountedRef } = useManagerData<Project>(
+        async () => {
+            const { data, error } = await supabase
+                .from('projects')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+        },
+        'ProjectsManager'
+    );
+
     const [searchTerm, setSearchTerm] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -36,30 +48,11 @@ export const ProjectsManager = () => {
         videos: []
     });
 
-    useEffect(() => {
-        fetchProjects();
-    }, []);
-
-    const fetchProjects = async () => {
-        setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('projects')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setProjects(data || []);
-        } catch (error) {
-            console.error('Error fetching projects:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            console.log('💾 Saving project...');
+
             if (editingProject) {
                 const projectData: ProjectUpdate = {
                     title: formData.title,
@@ -80,17 +73,25 @@ export const ProjectsManager = () => {
                 // @ts-ignore - Supabase type inference issue
                 const { error } = await supabase.from('projects').update(projectData).eq('id', editingProject.id);
                 if (error) throw error;
+                console.log('✅ Project updated');
             } else {
                 // @ts-ignore - Supabase type inference issue
                 const { error } = await supabase.from('projects').insert([formData]);
                 if (error) throw error;
+                console.log('✅ Project created');
             }
+
+            if (!mountedRef.current) return;
+
             setShowForm(false);
             setEditingProject(null);
             resetForm();
-            fetchProjects();
+            await refetch();
         } catch (error: any) {
-            alert('Error: ' + error.message);
+            console.error('❌ Error saving project:', error);
+            if (mountedRef.current) {
+                alert('Error: ' + error.message);
+            }
         }
     };
 
@@ -120,6 +121,7 @@ export const ProjectsManager = () => {
     const handleDelete = async (id: string) => {
         if (!confirm('Delete this project?')) return;
         try {
+            console.log('🗑️ Deleting project...');
             const project = projects.find(p => p.id === id);
 
             const imagesToDelete: string[] = [];
@@ -132,9 +134,15 @@ export const ProjectsManager = () => {
 
             const { error } = await supabase.from('projects').delete().eq('id', id);
             if (error) throw error;
-            fetchProjects();
+            console.log('✅ Project deleted');
+
+            if (!mountedRef.current) return;
+            await refetch();
         } catch (error) {
-            alert('Error deleting project');
+            console.error('❌ Error deleting project:', error);
+            if (mountedRef.current) {
+                alert('Error deleting project');
+            }
         }
     };
 
