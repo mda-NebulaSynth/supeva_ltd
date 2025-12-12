@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, Calendar, MessageSquare, Trash2, Eye, Filter, Search, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -11,9 +11,6 @@ type ContactSubmissionUpdate = Database['public']['Tables']['contact_submissions
 type Project = { id: string; title: string };
 
 export const ContactsManager = () => {
-    // Add a local mounted ref to track component mount state
-    const localMountedRef = useRef(true);
-
     const { data: submissions, loading, refetch, mountedRef } = useManagerData<ContactSubmission>(
         async () => {
             const { data, error } = await supabase
@@ -33,23 +30,13 @@ export const ContactsManager = () => {
     const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmission | null>(null);
     const [showDetails, setShowDetails] = useState(false);
 
-    // Setup cleanup
-    useEffect(() => {
-        localMountedRef.current = true;
-        return () => {
-            localMountedRef.current = false;
-        };
-    }, []);
-
     // Fetch projects separately (not part of the main data hook)
     useEffect(() => {
         const fetchProjects = async () => {
             const { data: projectsData } = await supabase
                 .from('projects')
                 .select('id, title');
-            if (localMountedRef.current) {
-                setProjects(projectsData || []);
-            }
+            setProjects(projectsData || []);
         };
         fetchProjects();
     }, []);
@@ -61,23 +48,22 @@ export const ContactsManager = () => {
 
             const { error } = await supabase
                 .from('contact_submissions')
+                // @ts-ignore - Supabase type inference issue
                 .update(updateData)
                 .eq('id', id);
 
             if (error) throw error;
             console.log('✅ Contact status updated');
 
-            // Check both mounted refs
-            if (!localMountedRef.current || !mountedRef.current) return;
-
+            if (!mountedRef.current) return;
             await refetch();
 
-            if (selectedSubmission?.id === id && localMountedRef.current) {
+            if (selectedSubmission?.id === id) {
                 setSelectedSubmission({ ...selectedSubmission, status });
             }
         } catch (error) {
             console.error('❌ Error updating status:', error);
-            if (localMountedRef.current) {
+            if (mountedRef.current) {
                 alert('Failed to update status. Please try again.');
             }
         }
@@ -96,18 +82,16 @@ export const ContactsManager = () => {
             if (error) throw error;
             console.log('✅ Contact submission deleted');
 
-            // Check both mounted refs
-            if (!localMountedRef.current || !mountedRef.current) return;
-
+            if (!mountedRef.current) return;
             await refetch();
 
-            if (selectedSubmission?.id === id && localMountedRef.current) {
+            if (selectedSubmission?.id === id) {
                 setShowDetails(false);
                 setSelectedSubmission(null);
             }
         } catch (error) {
             console.error('❌ Error deleting submission:', error);
-            if (localMountedRef.current) {
+            if (mountedRef.current) {
                 alert('Failed to delete submission. Please try again.');
             }
         }
