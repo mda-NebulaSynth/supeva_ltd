@@ -114,6 +114,8 @@ export const SetupPasswordPage = () => {
         setLoading(true);
 
         try {
+            console.log('🔐 Starting password setup...');
+
             // Update user password
             const { error: passwordError } = await supabase.auth.updateUser({
                 password: password,
@@ -121,89 +123,76 @@ export const SetupPasswordPage = () => {
             });
 
             if (passwordError) throw passwordError;
+            console.log('✅ Password updated successfully');
 
             // Get current user
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('User not found after password update');
+            console.log('👤 User confirmed:', user.id);
 
             // Check if profile exists
-            const { data: existingProfile } = await supabase
+            const { data: existingProfile, error: checkError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
                 .maybeSingle();
 
+            if (checkError) {
+                console.error('❌ Error checking profile:', checkError);
+                throw checkError;
+            }
+
+            console.log('🔍 Profile check result:', existingProfile ? 'exists' : 'does not exist');
+
             if (!existingProfile) {
                 // Create profile
-                const { error: profileError } = await supabase
+                console.log('📝 Creating new profile...');
+                const { data: newProfile, error: profileError } = await supabase
                     .from('profiles')
-                    .upsert({
+                    .insert({
                         id: user.id,
                         email: user.email,
                         full_name: fullName.trim(),
-                        role: 'staff',
-                        updated_at: new Date().toISOString()
-                    }, {
-                        onConflict: 'id',
-                        ignoreDuplicates: false
-                    });
+                        role: 'staff'
+                    })
+                    .select()
+                    .single();
 
                 if (profileError) {
-                    // Try insert as fallback
-                    await supabase
-                        .from('profiles')
-                        .insert({
-                            id: user.id,
-                            email: user.email,
-                            full_name: fullName.trim(),
-                            role: 'staff'
-                        });
+                    console.error('❌ Error creating profile:', profileError);
+                    throw new Error(`Failed to create profile: ${profileError.message}`);
                 }
+
+                console.log('✅ Profile created successfully:', newProfile);
             } else {
                 // Update existing profile
-                await supabase
+                console.log('📝 Updating existing profile...');
+                const { error: updateError } = await supabase
                     .from('profiles')
                     .update({
                         full_name: fullName.trim(),
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', user.id);
+
+                if (updateError) {
+                    console.error('❌ Error updating profile:', updateError);
+                    throw updateError;
+                }
+
+                console.log('✅ Profile updated successfully');
             }
 
             // Set success state
+            console.log('🎉 Setup complete, showing success screen');
             setSuccess(true);
 
-            // SMART REDIRECT: Check if profile is loaded before redirecting
-            const checkAndRedirect = async () => {
-                // First, verify the profile was created
-                const { data: { user: currentUser } } = await supabase.auth.getUser();
-                if (currentUser) {
-                    // Try to get profile directly
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', currentUser.id)
-                        .maybeSingle();
-
-                    if (profile) {
-                        console.log('✅ Profile confirmed, redirecting immediately...');
-                        // Small delay for user to see success message
-                        setTimeout(() => {
-                            navigate('/admin', { replace: true });
-                        }, 1500);
-                    } else {
-                        console.log('⚠️ Profile not found yet, waiting...');
-                        // Wait longer and redirect anyway (ProtectedRoute will handle it)
-                        setTimeout(() => {
-                            console.log('🔄 Redirecting to admin (profile check timed out)');
-                            navigate('/admin', { replace: true });
-                        }, 3000);
-                    }
-                }
-            };
-
-            // Start the redirect check
-            checkAndRedirect();
+            // Simple redirect after showing success message
+            console.log('⏱️ Scheduling redirect to admin...');
+            setTimeout(() => {
+                console.log('🚀 Redirecting to /admin');
+                navigate('/admin', { replace: true });
+            }, 2000);
 
         } catch (err: any) {
             console.error('Setup error:', err);
