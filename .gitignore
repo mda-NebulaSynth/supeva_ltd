@@ -67,3 +67,5 @@ supabase-migrations/03-create-storage-bucket.sql
 supabase-migrations/04-fix-rls-policies.sql
 nul
 TRAINING_GUIDE.md
+TERMS_AND_CONDITIONS.md
+.gitignore
