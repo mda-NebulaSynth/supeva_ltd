@@ -66,3 +66,4 @@ supabase-migrations/02-add-gallery-and-videos.sql
 supabase-migrations/03-create-storage-bucket.sql
 supabase-migrations/04-fix-rls-policies.sql
 nul
+TRAINING_GUIDE.md

@@ -275,7 +275,7 @@ export const ProjectDetailPage = () => {
                                     <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
                                         <MapPin className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-primary-300 flex-shrink-0" />
                                         <span className="text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl font-light tracking-wide drop-shadow-lg">
-                                            {project.location}
+                                            {project.location_display_name}
                                         </span>
                                     </div>
 

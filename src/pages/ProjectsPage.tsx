@@ -11,6 +11,7 @@ interface Project {
     title: string;
     slug: string;
     location: string;
+    location_display_name: string;
     price_min: number;
     price_max: number;
     featured_image: string;
@@ -172,7 +173,7 @@ export const ProjectsPage = () => {
                                         </h3>
                                         <div className="flex items-center gap-2 text-gray-600 mb-4">
                                             <MapPin className="w-4 h-4" />
-                                            <span>{project.location}</span>
+                                            <span>{project.location_display_name}</span>
                                         </div>
                                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
                                             <div className="flex items-center gap-1">

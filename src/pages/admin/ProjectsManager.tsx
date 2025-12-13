@@ -311,7 +311,7 @@ export const ProjectsManager = () => {
                                     <h3 className="text-xl font-bold mb-2">{project.title}</h3>
                                     <p className="text-gray-600 text-sm mb-4 line-clamp-2">{project.description}</p>
                                     <div className="text-sm text-gray-500 mb-4">
-                                        <p>{project.location}</p>
+                                        <p>{project.location_display_name}</p>
                                         <p>{project.bedrooms} beds • {project.bathrooms} baths</p>
                                     </div>
                                     <div className="flex gap-2">
@@ -541,7 +541,6 @@ export const ProjectsManager = () => {
                                                     onChange={(e) => setFormData({ ...formData, price_min: +e.target.value })}
                                                     className="input w-full text-base focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                                     min="0"
-                                                    step="1000"
                                                     placeholder="e.g., 5000000"
                                                 />
                                             </div>
@@ -557,7 +556,6 @@ export const ProjectsManager = () => {
                                                     onChange={(e) => setFormData({ ...formData, price_max: +e.target.value })}
                                                     className="input w-full text-base focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                                     min="0"
-                                                    step="1000"
                                                     placeholder="e.g., 15000000"
                                                 />
                                             </div>
@@ -601,7 +599,6 @@ export const ProjectsManager = () => {
                                                     onChange={(e) => setFormData({ ...formData, area_sqft: +e.target.value })}
                                                     className="input w-full text-base focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                                     min="0"
-                                                    step="100"
                                                     placeholder="e.g., 1500"
                                                 />
                                             </div>
