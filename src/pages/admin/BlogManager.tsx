@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/database.types';
 import { useAuth } from '../../contexts/AuthContext';
 import { MediaUpload } from '../../components/MediaUpload';
+import MarkdownEditor from '../../components/MarkdownEditor';
 import { deleteImageFromStorage } from '../../utils/storageCleanup';
 import { useManagerData } from '../../hooks/useManagerData';
 
@@ -500,32 +501,26 @@ export const BlogManager = () => {
 
                             {/* Content */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Content <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <FileText className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
-                                    <textarea
-                                        required
-                                        value={formData.content}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, content: e.target.value });
-                                            if (errors.content) setErrors({ ...errors, content: undefined });
-                                        }}
-                                        rows={12}
-                                        className={`w-full pl-12 pr-4 py-3.5 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-y ${errors.content ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-300'}`}
-                                        placeholder="Write your blog post content here..."
-                                    />
-                                </div>
+                                <MarkdownEditor
+                                    label={
+                                        <span>
+                                            Content <span className="text-red-500">*</span>
+                                        </span>
+                                    }
+                                    value={formData.content || ''} // Add fallback to empty string
+                                    onChange={(value) => {
+                                        setFormData({ ...formData, content: value });
+                                        if (errors.content) setErrors({ ...errors, content: undefined });
+                                    }}
+                                    placeholder="Write your blog post content here...&#10;&#10;Example:&#10;## Introduction&#10;Welcome to our blog! This post covers...&#10;&#10;## Key Points&#10;- Point one&#10;- Point two&#10;- Point three&#10;&#10;[Learn more](https://example.com)"
+                                    minHeight="400px"
+                                />
                                 {errors.content && (
                                     <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
                                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                         <span>{errors.content}</span>
                                     </div>
                                 )}
-                                <p className="mt-2 text-xs text-gray-500">
-                                    Use markdown or HTML formatting for rich content
-                                </p>
                             </div>
 
                             {/* Featured Image */}

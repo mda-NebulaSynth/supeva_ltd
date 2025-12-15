@@ -52,15 +52,15 @@ export const Header = () => {
             {/* Header Container */}
             <header
                 className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled
-                        ? 'bg-white/95 backdrop-blur-lg shadow-md border-b border-gray-200'
-                        : 'bg-white md:bg-transparent'
+                    ? 'bg-white/95 backdrop-blur-lg shadow-md border-b border-gray-200'
+                    : 'bg-white md:bg-transparent'
                     }`}
             >
                 <nav className="container-custom">
                     <div className="flex items-center justify-between h-16 md:h-20">
                         {/* Logo - Mobile Optimized */}
-                        <Link 
-                            to="/" 
+                        <Link
+                            to="/"
                             className="flex items-center space-x-2.5 group active:scale-95 transition-transform"
                             aria-label="Supeva Home"
                         >
@@ -87,10 +87,10 @@ export const Header = () => {
                                         key={link.to}
                                         to={link.to}
                                         className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${isActive
-                                                ? 'bg-blue-600 text-white shadow-sm'
-                                                : isScrolled
-                                                    ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
-                                                    : 'text-gray-900 hover:bg-white/80 hover:text-blue-700'
+                                            ? 'bg-blue-600 text-white shadow-sm'
+                                            : isScrolled
+                                                ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                                : 'text-gray-900 hover:bg-white/80 hover:text-blue-700'
                                             }`}
                                         aria-current={isActive ? 'page' : undefined}
                                     >
@@ -133,10 +133,10 @@ export const Header = () => {
                         <button
                             onClick={() => setIsOpen(!isOpen)}
                             className={`md:hidden p-2.5 rounded-lg transition-all duration-200 ${isOpen
-                                    ? 'bg-blue-600 text-white'
-                                    : isScrolled
-                                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                ? 'bg-blue-600 text-white'
+                                : isScrolled
+                                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 }`}
                             aria-label={isOpen ? "Close menu" : "Open menu"}
                             aria-expanded={isOpen}
@@ -153,12 +153,12 @@ export const Header = () => {
                     {isOpen && (
                         <>
                             {/* Backdrop */}
-                            <div 
+                            <div
                                 className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden animate-fade-in"
                                 onClick={() => setIsOpen(false)}
                                 aria-hidden="true"
                             />
-                            
+
                             {/* Menu Panel */}
                             <div className="fixed top-16 right-0 left-0 z-50 md:hidden animate-slide-down">
                                 <div className="bg-white rounded-b-2xl shadow-xl mx-4 border border-gray-200 overflow-hidden">
@@ -193,8 +193,8 @@ export const Header = () => {
                                                     key={link.to}
                                                     to={link.to}
                                                     className={`flex items-center justify-between px-4 py-3.5 rounded-lg transition-all duration-200 ${isActive
-                                                            ? 'bg-blue-50 text-blue-700'
-                                                            : 'text-gray-700 hover:bg-gray-50'
+                                                        ? 'bg-blue-50 text-blue-700'
+                                                        : 'text-gray-700 hover:bg-gray-50'
                                                         }`}
                                                     aria-current={isActive ? 'page' : undefined}
                                                     onClick={() => setIsOpen(false)}
@@ -266,7 +266,7 @@ export const Header = () => {
             </header>
 
             {/* Spacer for fixed header - ONLY on mobile */}
-            <div className="h-16 md:hidden"></div>
+            <div className="h-0 md:hidden"></div>
         </>
     );
 };

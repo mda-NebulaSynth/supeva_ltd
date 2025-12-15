@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { StaggeredList, StaggeredItem } from '../../components/animated/StaggeredList';
 import { fadeInUp } from '../../utils/animations';
 import { MediaUpload } from '../../components/MediaUpload';
+import MarkdownEditor from '../../components/MarkdownEditor';
 import type { Database } from '../../lib/database.types';
 import { deleteImagesFromStorage } from '../../utils/storageCleanup';
 import { useManagerData } from '../../hooks/useManagerData';
@@ -48,7 +49,10 @@ export const ProjectsManager = () => {
         status: 'active',
         featured_image: '',
         gallery: [],
-        videos: []
+        videos: [],
+        amenities: '',
+        seo_title: '',
+        seo_description: ''
     });
 
     // Debounced function for image preview
@@ -87,7 +91,10 @@ export const ProjectsManager = () => {
                     status: formData.status,
                     featured_image: formData.featured_image,
                     gallery: formData.gallery,
-                    videos: formData.videos
+                    videos: formData.videos,
+                    amenities: formData.amenities,
+                    seo_title: formData.seo_title,
+                    seo_description: formData.seo_description
                 };
                 // @ts-ignore - Supabase type inference issue
                 const { error } = await supabase.from('projects').update(projectData).eq('id', editingProject.id);
@@ -130,7 +137,10 @@ export const ProjectsManager = () => {
             status: project.status,
             featured_image: project.featured_image,
             gallery: project.gallery || [],
-            videos: project.videos || []
+            videos: project.videos || [],
+            amenities: project.amenities || '',
+            seo_title: project.seo_title || '',
+            seo_description: project.seo_description || ''
         });
         const mapsUrl = extractGoogleMapsUrl(project.location);
         setMapPreviewUrl(mapsUrl);
@@ -241,7 +251,10 @@ export const ProjectsManager = () => {
             status: 'active',
             featured_image: '',
             gallery: [],
-            videos: []
+            videos: [],
+            amenities: '',
+            seo_title: '',
+            seo_description: ''
         });
         setMapPreviewUrl(null);
         setShowImagePreview(false);
@@ -417,6 +430,19 @@ export const ProjectsManager = () => {
                                                     rows={4}
                                                     placeholder="Enter project description"
                                                 />
+                                            </div>
+
+                                            <div className="sm:col-span-2">
+                                                <MarkdownEditor
+                                                    label="Amenities (Markdown supported)"
+                                                    value={formData.amenities || ''}
+                                                    onChange={(value) => setFormData({ ...formData, amenities: value })}
+                                                    placeholder="List amenities using markdown...&#10;&#10;Example:&#10;## Key Features&#10;- Swimming pool&#10;- 24/7 security&#10;- Gym & fitness center&#10;- Children's playground&#10;&#10;## Nearby&#10;- 5 min to shopping mall&#10;- 10 min to international school"
+                                                    minHeight="250px"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-2">
+                                                    Use the toolbar to format your amenities list with headings, bullet points, links, and tables.
+                                                </p>
                                             </div>
 
                                             <div className="sm:col-span-2">
@@ -684,6 +710,51 @@ export const ProjectsManager = () => {
                                                         )}
                                                     </div>
                                                 )}
+                                            </div>
+
+                                            {/* SEO Fields */}
+                                            <div className="sm:col-span-2">
+                                                <div className="border-t pt-6 mt-4">
+                                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">SEO Settings (Optional)</h3>
+
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <label htmlFor="project-seo-title" className="block text-sm font-medium text-gray-700 mb-2">
+                                                                SEO Title
+                                                            </label>
+                                                            <input
+                                                                id="project-seo-title"
+                                                                type="text"
+                                                                value={formData.seo_title || ''}
+                                                                onChange={(e) => setFormData({ ...formData, seo_title: e.target.value })}
+                                                                className="input w-full text-base focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                                                placeholder="Custom title for search engines (leave empty to use project title)"
+                                                                maxLength={60}
+                                                            />
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Recommended: Under 60 characters. {formData.seo_title?.length || 0}/60
+                                                            </p>
+                                                        </div>
+
+                                                        <div>
+                                                            <label htmlFor="project-seo-description" className="block text-sm font-medium text-gray-700 mb-2">
+                                                                SEO Description
+                                                            </label>
+                                                            <textarea
+                                                                id="project-seo-description"
+                                                                value={formData.seo_description || ''}
+                                                                onChange={(e) => setFormData({ ...formData, seo_description: e.target.value })}
+                                                                className="textarea w-full text-base focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                                                rows={3}
+                                                                placeholder="Custom description for search engines (leave empty to use project description)"
+                                                                maxLength={160}
+                                                            />
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Recommended: Under 160 characters. {formData.seo_description?.length || 0}/160
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

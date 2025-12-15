@@ -151,7 +151,7 @@ export interface Database {
         Row: {
           seo_description: string
           seo_title: string
-          amenities: string[]
+          amenities: string
           id: string
           created_at: string
           title: string
@@ -186,6 +186,9 @@ export interface Database {
           featured_image: string
           gallery?: string[]
           videos?: string[]
+          amenities?: string
+          seo_title?: string
+          seo_description?: string
         }
         Update: {
           id?: string
@@ -204,6 +207,9 @@ export interface Database {
           featured_image?: string
           gallery?: string[]
           videos?: string[]
+          amenities?: string
+          seo_title?: string
+          seo_description?: string
         }
       }
       project_updates: {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Calendar, Clock, ArrowLeft, Share2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { SEO } from '../components/SEO';
@@ -262,13 +263,82 @@ export const BlogPostPage = () => {
                 {/* Article Content */}
                 <AnimatedSection className="container-custom max-w-4xl mb-16">
                     <div className="prose prose-lg max-w-none">
-                        {post.content.split('\n').map((paragraph, index) => (
-                            paragraph.trim() && (
-                                <p key={index} className="mb-6 text-gray-700 leading-relaxed">
-                                    {paragraph}
-                                </p>
-                            )
-                        ))}
+                        <ReactMarkdown
+                            components={{
+                                h1: ({ children }) => (
+                                    <h1 className="text-3xl md:text-4xl font-bold mb-6 mt-8 text-gray-900">{children}</h1>
+                                ),
+                                h2: ({ children }) => (
+                                    <h2 className="text-2xl md:text-3xl font-bold mb-4 mt-8 text-gray-900">{children}</h2>
+                                ),
+                                h3: ({ children }) => (
+                                    <h3 className="text-xl md:text-2xl font-bold mb-3 mt-6 text-gray-900">{children}</h3>
+                                ),
+                                p: ({ children }) => <p className="mb-6 text-gray-700 leading-relaxed">{children}</p>,
+                                ul: ({ children }) => (
+                                    <ul className="list-disc list-inside mb-6 space-y-2 text-gray-700">{children}</ul>
+                                ),
+                                ol: ({ children }) => (
+                                    <ol className="list-decimal list-inside mb-6 space-y-2 text-gray-700">{children}</ol>
+                                ),
+                                li: ({ children }) => <li className="mb-2">{children}</li>,
+                                a: ({ children, href }) => (
+                                    <a
+                                        href={href}
+                                        className="text-primary-600 hover:text-primary-700 underline font-medium"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        {children}
+                                    </a>
+                                ),
+                                blockquote: ({ children }) => (
+                                    <blockquote className="border-l-4 border-primary-300 pl-6 py-2 italic text-gray-600 mb-6 bg-gray-50">
+                                        {children}
+                                    </blockquote>
+                                ),
+                                code: ({ children }) => (
+                                    <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-red-600">
+                                        {children}
+                                    </code>
+                                ),
+                                pre: ({ children }) => (
+                                    <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-6">
+                                        {children}
+                                    </pre>
+                                ),
+                                table: ({ children }) => (
+                                    <div className="overflow-x-auto mb-6">
+                                        <table className="min-w-full border-collapse border border-gray-300">
+                                            {children}
+                                        </table>
+                                    </div>
+                                ),
+                                thead: ({ children }) => (
+                                    <thead className="bg-gray-100">{children}</thead>
+                                ),
+                                tbody: ({ children }) => <tbody>{children}</tbody>,
+                                tr: ({ children }) => <tr className="border-b border-gray-300">{children}</tr>,
+                                th: ({ children }) => (
+                                    <th className="border border-gray-300 px-4 py-2 text-left font-semibold">
+                                        {children}
+                                    </th>
+                                ),
+                                td: ({ children }) => (
+                                    <td className="border border-gray-300 px-4 py-2">{children}</td>
+                                ),
+                                img: ({ src, alt }) => (
+                                    <img
+                                        src={src}
+                                        alt={alt || ''}
+                                        className="w-full rounded-lg shadow-lg my-8"
+                                        loading="lazy"
+                                    />
+                                ),
+                            }}
+                        >
+                            {post.content}
+                        </ReactMarkdown>
                     </div>
                 </AnimatedSection>
 

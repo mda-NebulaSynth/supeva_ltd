@@ -6,6 +6,7 @@ import {
     Share2, Home, TreePine, Dumbbell, Car, Wifi, Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
 import { supabase } from '../lib/supabase';
 import { SEO } from '../components/SEO';
 import { AdSlot } from '../components/AdSlot';
@@ -16,15 +17,6 @@ import type { Database } from '../lib/database.types';
 
 type Project = Database['public']['Tables']['projects']['Row'];
 type ProjectUpdate = Database['public']['Tables']['project_updates']['Row'];
-
-const amenityIcons: Record<string, any> = {
-    'Swimming Pool': Wifi,
-    'Gym': Dumbbell,
-    'Parking': Car,
-    'Garden': TreePine,
-    'Security': Shield,
-    'default': Home
-};
 
 export const ProjectDetailPage = () => {
     const { slug } = useParams<{ slug: string }>();
@@ -143,7 +135,6 @@ export const ProjectDetailPage = () => {
 
     const videos = (project.videos as string[] || []).filter(url => url && url.trim() !== '');
     const allMedia = [...images, ...videos];
-    const amenities = project.amenities as string[] || [];
 
     // Determine if current item is a video
     const isVideo = (index: number) => index >= images.length;
@@ -455,26 +446,77 @@ export const ProjectDetailPage = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
+                                className="max-w-4xl"
                             >
                                 <h2 className="text-2xl sm:text-3xl font-display font-bold mb-4 sm:mb-6">Amenities & Features</h2>
-                                {amenities.length > 0 ? (
-                                    <StaggeredList className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                        {amenities.map((amenity, index) => {
-                                            const Icon = amenityIcons[amenity] || amenityIcons.default;
-                                            return (
-                                                <StaggeredItem key={index}>
-                                                    <div className="card p-4 sm:p-6 hover:shadow-lg transition-shadow">
-                                                        <div className="flex items-center gap-3 sm:gap-4">
-                                                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                                <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
-                                                            </div>
-                                                            <span className="font-medium text-sm sm:text-base md:text-lg">{amenity}</span>
+                                {project.amenities && project.amenities.trim() ? (
+                                    <div className="card p-6 sm:p-8">
+                                        <div className="prose prose-sm sm:prose-base max-w-none">
+                                            <ReactMarkdown
+                                                components={{
+                                                    h1: ({ children }) => (
+                                                        <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-900">{children}</h1>
+                                                    ),
+                                                    h2: ({ children }) => (
+                                                        <h2 className="text-xl sm:text-2xl font-bold mb-3 text-gray-900">{children}</h2>
+                                                    ),
+                                                    h3: ({ children }) => (
+                                                        <h3 className="text-lg sm:text-xl font-bold mb-2 text-gray-900">{children}</h3>
+                                                    ),
+                                                    p: ({ children }) => <p className="mb-4 text-gray-700">{children}</p>,
+                                                    ul: ({ children }) => (
+                                                        <ul className="list-disc list-inside mb-4 space-y-2 text-gray-700">{children}</ul>
+                                                    ),
+                                                    ol: ({ children }) => (
+                                                        <ol className="list-decimal list-inside mb-4 space-y-2 text-gray-700">{children}</ol>
+                                                    ),
+                                                    li: ({ children }) => <li className="text-sm sm:text-base">{children}</li>,
+                                                    a: ({ children, href }) => (
+                                                        <a
+                                                            href={href}
+                                                            className="text-primary-600 hover:text-primary-700 underline"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            {children}
+                                                        </a>
+                                                    ),
+                                                    blockquote: ({ children }) => (
+                                                        <blockquote className="border-l-4 border-primary-300 pl-4 italic text-gray-600 mb-4">
+                                                            {children}
+                                                        </blockquote>
+                                                    ),
+                                                    code: ({ children }) => (
+                                                        <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono text-red-600">
+                                                            {children}
+                                                        </code>
+                                                    ),
+                                                    table: ({ children }) => (
+                                                        <div className="overflow-x-auto mb-4">
+                                                            <table className="min-w-full border-collapse border border-gray-300">
+                                                                {children}
+                                                            </table>
                                                         </div>
-                                                    </div>
-                                                </StaggeredItem>
-                                            );
-                                        })}
-                                    </StaggeredList>
+                                                    ),
+                                                    thead: ({ children }) => (
+                                                        <thead className="bg-gray-100">{children}</thead>
+                                                    ),
+                                                    tbody: ({ children }) => <tbody>{children}</tbody>,
+                                                    tr: ({ children }) => <tr className="border-b border-gray-300">{children}</tr>,
+                                                    th: ({ children }) => (
+                                                        <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-sm sm:text-base">
+                                                            {children}
+                                                        </th>
+                                                    ),
+                                                    td: ({ children }) => (
+                                                        <td className="border border-gray-300 px-4 py-2 text-sm sm:text-base">{children}</td>
+                                                    ),
+                                                }}
+                                            >
+                                                {project.amenities}
+                                            </ReactMarkdown>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <p className="text-sm sm:text-base text-gray-500">No amenities listed for this property.</p>
                                 )}
